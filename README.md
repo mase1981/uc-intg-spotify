@@ -50,6 +50,8 @@ This integration allows you to control Spotify playback and view currently playi
 
 ## Installation
 
+**NOTE:** During installation once you click log in to your spotify account: it might take some time for it to log in and redict to the empty page - this is expected and due to Spotify API rate. 
+
 ### Method 1: Pre-built Release (Recommended)
 1. Download the latest `.tar.gz` file from the [Releases](https://github.com/mase1981/uc-intg-spotify/releases) page
 2. Upload to your Remote Two via the web configurator
