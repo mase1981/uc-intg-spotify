@@ -1,4 +1,4 @@
-# Spotify Integration for Unfolded Circle Remote Two
+# Spotify Integration for Unfolded Circle Remote Two/3
 
 This integration allows you to control Spotify playback and view currently playing track information on your Unfolded Circle Remote Two/Three.
 
