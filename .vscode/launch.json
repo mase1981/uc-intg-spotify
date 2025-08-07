@@ -1,0 +1,13 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Spotify Integration",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/uc_intg_spotify/driver.py",
+            "console": "integratedTerminal",
+            "justMyCode": false
+        }
+    ]
+}

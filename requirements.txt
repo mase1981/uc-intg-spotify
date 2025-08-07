@@ -1,0 +1,6 @@
+ucapi==0.3.1
+websockets==14.1
+aiohttp>=3.8.0
+pyee>=11.0.0
+zeroconf>=0.131.0
+certifi

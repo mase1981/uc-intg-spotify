@@ -1,0 +1,76 @@
+{
+  "driver_id": "spotify",
+  "version": "0.1.0",
+  "min_core_api": "0.3.1",
+  "name": {
+    "en": "Spotify"
+  },
+  "description": {
+    "en": "Control Spotify playback and view currently playing track information."
+  },
+  "developer": {
+    "name": "Meir Miyara",
+    "email": "meir.miyara@gmail.com",
+    "url": "https://github.com/mase1981"
+  },
+  "home_page": "https://github.com/mase1981/uc-intg-spotify",
+  "documentation": "https://github.com/mase1981/uc-intg-spotify/blob/main/README.md",
+  "setup_data_schema": {
+    "title": {
+      "en": "Spotify Setup"
+    },
+    "settings": [
+      {
+        "id": "instructions",
+        "label": {
+          "en": "Setup Instructions"
+        },
+        "field": {
+          "label": {
+            "value": {
+              "en": "Before proceeding, you need to create a Spotify Developer App:\n\n1. Go to https://developer.spotify.com/dashboard\n2. Log in with your Spotify account\n3. Click 'Create App'\n4. App Name: 'UC Remote Integration'\n5. App Description: 'Unfolded Circle Remote integration'\n6. Redirect URI: https://example.com/callback\n7. Check 'Web API' and save\n8. Copy your Client ID and Client Secret below"
+            }
+          }
+        }
+      },
+      {
+        "id": "client_id",
+        "label": {
+          "en": "Spotify Client ID"
+        },
+        "field": {
+          "text": {
+            "value": "",
+            "placeholder": "Enter your Spotify app Client ID"
+          }
+        }
+      },
+      {
+        "id": "client_secret",
+        "label": {
+          "en": "Spotify Client Secret"
+        },
+        "field": {
+          "text": {
+            "value": "",
+            "placeholder": "Enter your Spotify app Client Secret"
+          }
+        }
+      },
+      {
+        "id": "is_premium",
+        "label": {
+          "en": "Do you have Spotify Premium?"
+        },
+        "field": {
+          "checkbox": {
+            "value": false
+          }
+        }
+      }
+    ]
+  },
+  "release_date": "2024-08-06",
+  "icon": "uc:cloud-music",
+  "port": 9090
+}
