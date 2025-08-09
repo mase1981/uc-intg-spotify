@@ -75,10 +75,10 @@ class SpotifyRemote:
         
         if self._config and self._config.is_premium_user():
             main_page.add(create_ui_icon("uc:play-pause", 1, 1, Size(2, 1), "PLAY_PAUSE"))
-            main_page.add(create_ui_icon("uc:skip-previous", 0, 2, Size(1, 1), "PREVIOUS"))
-            main_page.add(create_ui_icon("uc:skip-next", 3, 2, Size(1, 1), "NEXT"))
-            main_page.add(create_ui_icon("uc:volume-up", 1, 3, Size(1, 1), "VOLUME_UP"))
-            main_page.add(create_ui_icon("uc:volume-down", 2, 3, Size(1, 1), "VOLUME_DOWN"))
+            main_page.add(create_ui_icon("uc:backward", 0, 2, Size(1, 1), "PREVIOUS"))
+            main_page.add(create_ui_icon("uc:forward", 3, 2, Size(1, 1), "NEXT"))
+            main_page.add(create_ui_icon("uc:volume-high", 1, 3, Size(1, 1), "VOLUME_UP"))
+            main_page.add(create_ui_icon("uc:volume-low", 2, 3, Size(1, 1), "VOLUME_DOWN"))
         else:
             main_page.add(create_ui_text("Spotify Premium required", 0, 1, Size(4, 1)))
             main_page.add(create_ui_text("for playback control", 0, 2, Size(4, 1)))

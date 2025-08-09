@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "uc-intg-spotify"
-version = "0.1.0"
+version = "0.1.1"
 description = "Spotify integration for Unfolded Circle Remote Two"
 authors = [
     {name = "Meir Miyara", email = "meir.miyara@gmail.com"}
