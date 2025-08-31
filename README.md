@@ -1,4 +1,9 @@
-# Spotify Integration for Unfolded Circle Remote Two
+# Spotify Integration for Unfolded Circle Remote Two/3
+![Version](https://img.shields.io/badge/version-0.1.1-green)
+![License](https://img.shields.io/badge/license-MPL--2.0-orange)
+[![Buy Me A Coffee](https://img.shields.io/badge/buy%20me%20a%20coffee-donate-yellow.svg)](https://buymeacoffee.com/meirmiyara)
+[![PayPal](https://img.shields.io/badge/PayPal-donate-blue.svg)](https://paypal.me/mmiyara)
+
 
 This integration allows you to control Spotify playback and view currently playing track information on your Unfolded Circle Remote Two/Three.
 
