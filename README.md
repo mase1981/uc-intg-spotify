@@ -1,4 +1,4 @@
-# Spotify Integration for Unfolded Circle Remote Two/3
+# Spotify Integration for Unfolded Circle Remote Two
 
 This integration allows you to control Spotify playback and view currently playing track information on your Unfolded Circle Remote Two/Three.
 
@@ -61,7 +61,6 @@ This integration allows you to control Spotify playback and view currently playi
 1. Clone this repository
 2. Set up your development environment (see Development section)
 
-
 ### Method 3: Docker Deployment
 
 You can run the Spotify integration as a Docker container for easy deployment and management.
@@ -78,22 +77,84 @@ You can run the Spotify integration as a Docker container for easy deployment an
    cd uc-spotify-integration
    ```
 
-2. **Download the docker-compose.yml:**
+2. **Download the docker-compose.yml file (choose one method):**
+
+   **Option A - Direct download:**
    ```bash
-   wget https://www.github.com/mase1981/uc-intg-spotify/main/docker-compose.yml
+   wget https://raw.githubusercontent.com/mase1981/uc-intg-spotify/main/docker-compose.yml
    ```
 
-3. **Start the container:**
+   **Option B - Using curl:**
+   ```bash
+   curl -o docker-compose.yml https://raw.githubusercontent.com/mase1981/uc-intg-spotify/main/docker-compose.yml
+   ```
+
+   **Option C - Create manually:**
+   Create a file named `docker-compose.yml` with the following content:
+   ```yaml
+   version: '3.8'
+
+   services:
+     spotify-integration:
+       build: .
+       # Uncomment the next line to use pre-built image instead of building
+       # image: mase1981/uc-intg-spotify:latest
+       container_name: uc-spotify-integration
+       restart: unless-stopped
+       
+       # Network configuration for mDNS discovery
+       network_mode: host
+       
+       # Environment variables (only technical settings)
+       environment:
+         - UC_CONFIG_HOME=/app/config
+         - UC_INTEGRATION_INTERFACE=0.0.0.0
+         - UC_INTEGRATION_HTTP_PORT=9090
+         # Uncomment to disable mDNS publishing if needed
+         # - UC_DISABLE_MDNS_PUBLISH=true
+       
+       # Volume for persistent configuration
+       volumes:
+         - spotify-config:/app/config
+       
+       # Health check
+       healthcheck:
+         test: ["CMD-SHELL", "curl -f http://localhost:9090/ || exit 1"]
+         interval: 30s
+         timeout: 10s
+         retries: 3
+         start_period: 30s
+       
+       # Logging configuration
+       logging:
+         driver: "json-file"
+         options:
+           max-size: "10m"
+           max-file: "3"
+
+   volumes:
+     spotify-config:
+       driver: local
+   ```
+
+3. **If using the pre-built image, edit the docker-compose.yml:**
+   ```bash
+   # Comment out the build line and uncomment the image line
+   sed -i 's/build: ./#build: ./' docker-compose.yml
+   sed -i 's/# image: mase1981/image: mase1981/' docker-compose.yml
+   ```
+
+4. **Start the container:**
    ```bash
    docker-compose up -d
    ```
 
-4. **Check logs:**
+5. **Check logs:**
    ```bash
    docker-compose logs -f spotify-integration
    ```
 
-5. **Configure via Remote Two:**
+6. **Configure via Remote Two:**
    - Open your Remote Two web configurator
    - The integration should be auto-discovered via mDNS
    - Follow the normal setup process:
@@ -101,7 +162,7 @@ You can run the Spotify integration as a Docker container for easy deployment an
      - Complete OAuth authentication
      - Entities will be created automatically
 
-#### Manual Docker Run
+#### Manual Docker Run (Alternative)
 
 ```bash
 docker run -d \
@@ -191,6 +252,12 @@ The integration uses host networking for:
 **Configuration lost after restart:**
 - Verify the Docker volume is properly mounted
 - Check volume permissions: `docker volume inspect uc-spotify-integration_spotify-config`
+
+**docker-compose.yml download issues:**
+- Try alternative download methods shown above
+- Verify your internet connection
+- Check if GitHub is accessible from your network
+- Use manual creation method if download fails
 
 ## Setup Process
 
