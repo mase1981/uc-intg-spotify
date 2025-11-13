@@ -218,7 +218,7 @@ class SpotifyClient:
         """Get the currently playing track from Spotify."""
         data = await self._make_authenticated_request("GET", "/me/player/currently-playing")
         
-        if not data or not data.get("item"):
+        if data is None or not data.get("item"):
             return None
         
         track = data["item"]
@@ -240,7 +240,7 @@ class SpotifyClient:
     async def get_playback_state(self) -> Optional[Dict[str, Any]]:
         """Get current playback state including volume."""
         data = await self._make_authenticated_request("GET", "/me/player")
-        if not data:
+        if data is None:
             return {}
         
         return {
@@ -252,7 +252,7 @@ class SpotifyClient:
     async def play_pause(self) -> bool:
         """Toggle play/pause state."""
         current_data = await self._make_authenticated_request("GET", "/me/player")
-        if not current_data:
+        if current_data is None:
             return False
         
         is_playing = current_data.get("is_playing", False)
