@@ -1,495 +1,566 @@
 # Spotify Integration for Unfolded Circle Remote Two/3
+![Spotify](https://img.shields.io/badge/Spotify-1DB954?style=flat-square&logo=spotify&logoColor=white)
+[![GitHub Release](https://img.shields.io/github/v/release/mase1981/uc-intg-spotify?style=flat-square)](https://github.com/mase1981/uc-intg-spotify/releases)
+![License](https://img.shields.io/badge/license-MPL--2.0-blue?style=flat-square)
+[![GitHub issues](https://img.shields.io/github/issues/mase1981/uc-intg-spotify?style=flat-square)](https://github.com/mase1981/uc-intg-spotify/issues)
+[![Community Forum](https://img.shields.io/badge/community-forum-blue?style=flat-square)](https://community.unfoldedcircle.com/)
 [![Discord](https://badgen.net/discord/online-members/zGVYf58)](https://discord.gg/zGVYf58)
-![GitHub Release](https://img.shields.io/github/v/release/mase1981/uc-intg-spotify)
-![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/mase1981/uc-intg-spotify/total)
-![License](https://img.shields.io/badge/license-MPL--2.0-blue)
-[![Buy Me A Coffee](https://img.shields.io/badge/buy%20me%20a%20coffee-donate-yellow.svg)](https://buymeacoffee.com/meirmiyara)
-[![PayPal](https://img.shields.io/badge/PayPal-donate-blue.svg)](https://paypal.me/mmiyara)
-[![Github Sponsors](https://img.shields.io/badge/GitHub%20Sponsors-30363D?&logo=GitHub-Sponsors&logoColor=EA4AAA)](https://github.com/sponsors/mase1981/button)
+![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/mase1981/uc-intg-spotify/total?style=flat-square)
+[![Buy Me A Coffee](https://img.shields.io/badge/buy%20me%20a%20coffee-donate-yellow.svg?style=flat-square)](https://buymeacoffee.com/meirmiyara)
+[![PayPal](https://img.shields.io/badge/PayPal-donate-blue.svg?style=flat-square)](https://paypal.me/mmiyara)
+[![Github Sponsors](https://img.shields.io/badge/GitHub%20Sponsors-30363D?&logo=GitHub-Sponsors&logoColor=EA4AAA&style=flat-square)](https://github.com/sponsors/mase1981)
 
+Control Spotify playback and view currently playing track information on your Unfolded Circle Remote Two/3 with real-time updates and album artwork.
 
+**IMPORTANT:** This integration requires creating your own Spotify Developer App (free, 5 minutes). Full setup instructions below.
 
-This integration allows you to control Spotify playback and view currently playing track information on your Unfolded Circle Remote Two/Three.
+---
 
-**NOTE:** This integration require some additional steps, you need to be comfortable with it. I simplified as much as i could, read this document carefully and you should be able to get this done fairely easily. Thank You: Meir Miyara :smiley:
-## Features
+## 🌟 Features
 
-### For All Users
-- Display currently playing track information (title, artist, album, artwork)
-- Real-time playback progress
-- Track duration display
-- Album artwork display
+### For All Users (Free & Premium)
+- 🎵 **Real-time Track Display** - Title, artist, album with artwork
+- ⏱️ **Playback Progress** - Live position and duration tracking
+- 🖼️ **Album Artwork** - High-quality cover art display
+- 📊 **State Updates** - Every 30 seconds (configurable)
 
-### For Spotify Premium Users
-- Play/pause control
-- Next/previous track navigation
-- Volume control
-- Physical button mapping for playback controls
+### For Spotify Premium Users Only
+- ▶️ **Play/Pause Control** - Toggle playback
+- ⏭️ **Track Navigation** - Next/previous track
+- 🔊 **Volume Control** - Set volume or use up/down
+- 🎮 **Physical Button Mapping** - UC Remote hardware buttons
+- 🎯 **Remote Entity** - Custom UI with playback controls
 
-## Prerequisites
+### Feature Comparison
 
-1. Unfolded Circle Remote Two/3
-2. Spotify account (Premium recommended for full functionality)
-3. **Spotify Developer App** (see setup below)
+| Feature | Free Users | Premium Users |
+|---------|------------|---------------|
+| Track Display | ✅ Full | ✅ Full |
+| Album Artwork | ✅ Yes | ✅ Yes |
+| Playback Progress | ✅ Yes | ✅ Yes |
+| Play/Pause Control | ❌ No | ✅ Yes |
+| Next/Previous | ❌ No | ✅ Yes |
+| Volume Control | ❌ No | ✅ Yes |
+| Button Mapping | ❌ No | ✅ Yes |
 
-## Spotify Developer App Setup
+---
 
-**IMPORTANT:** Before installing this integration, you must create a Spotify Developer App to get your own Client ID and Client Secret.
+## 📋 Requirements
 
-### Step 1: Create Spotify Developer App
+### Hardware
+- Unfolded Circle Remote Two or Remote 3
+- Spotify account (Premium recommended for full control)
+- Active Spotify playback session
+
+### Software
+- UC Remote firmware 1.7.0+
+- Spotify Developer App (instructions below)
+- Network connectivity
+
+---
+
+## 🔑 Spotify Developer App Setup
+
+**BEFORE INSTALLATION:** You must create a Spotify Developer App to get your Client ID and Client Secret.
+
+### Step 1: Create Developer App
 
 1. Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
 2. Log in with your Spotify account
 3. Click **"Create App"**
 4. Fill in the details:
-   - **App Name:** `UC Remote Integration` (or any name you prefer)
+   - **App Name:** `UC Remote Integration` (or any name)
    - **App Description:** `Unfolded Circle Remote integration`
    - **Redirect URI:** `https://example.com/callback` ⚠️ **Must be exactly this**
    - **API:** Check **"Web API"**
 5. Click **"Save"**
-6. On your app's dashboard, note down:
-   - **Client ID** (visible immediately)
-   - **Client Secret** (click "Show Client Secret" to reveal)
+6. Note your **Client ID** and **Client Secret** (click "Show Client Secret")
 
 ### Step 2: Important Notes
 
-- **Keep your credentials secure** - Don't share your Client ID and Client Secret
-- **Redirect URI must be exact** - Use `https://example.com/callback` exactly
-- **Free vs Premium** - The integration works with both, but Premium gets playback controls
+- ✅ Keep credentials secure - don't share them
+- ✅ Redirect URI must be **exactly** `https://example.com/callback`
+- ✅ Both Free and Premium accounts can create apps
+- ✅ No recurring costs - one-time setup
 
-## Installation
+---
 
-**NOTE:** During installation once you click log in to your spotify account: it might take some time for it to log in and redict to the empty page - this is expected and due to Spotify API rate. 
+## 🚀 Installation
 
-### Method 1: Pre-built Release (Recommended)
-1. Download the latest `.tar.gz` file from the [Releases](https://github.com/mase1981/uc-intg-spotify/releases) page
-2. Upload to your Remote Two via the web configurator
-3. Follow the setup process
+### Option 1: GitHub Release (Recommended)
 
-### Method 2: Development Installation
-1. Clone this repository
-2. Set up your development environment (see Development section)
+1. Download latest `.tar.gz` from [Releases](https://github.com/mase1981/uc-intg-spotify/releases)
+2. Open UC Remote configurator: `http://your-remote-ip/configurator`
+3. **Integrations** → **Add Integration** → **Upload driver**
+4. Select downloaded file
+5. Follow setup wizard
 
-### Method 3: Docker Deployment
-
-You can run the Spotify integration as a Docker container for easy deployment and management.
-
-#### Prerequisites for Docker
-1. Docker and Docker Compose installed
-2. Your Remote Two on the same network as the Docker host
-
-#### Quick Start with Docker Compose
-
-1. **Create a directory for the integration:**
-   ```bash
-   mkdir uc-spotify-integration
-   cd uc-spotify-integration
-   ```
-
-2. **Download the docker-compose.yml file (choose one method):**
-
-   **Option A - Direct download:**
-   ```bash
-   wget https://raw.githubusercontent.com/mase1981/uc-intg-spotify/main/docker-compose.yml
-   ```
-
-   **Option B - Using curl:**
-   ```bash
-   curl -o docker-compose.yml https://raw.githubusercontent.com/mase1981/uc-intg-spotify/main/docker-compose.yml
-   ```
-
-   **Option C - Create manually:**
-   Create a file named `docker-compose.yml` with the following content:
-   ```yaml
-   version: '3.8'
-
-   services:
-     spotify-integration:
-       build: .
-       # Uncomment the next line to use pre-built image instead of building
-       # image: mase1981/uc-intg-spotify:latest
-       container_name: uc-spotify-integration
-       restart: unless-stopped
-       
-       # Network configuration for mDNS discovery
-       network_mode: host
-       
-       # Environment variables (only technical settings)
-       environment:
-         - UC_CONFIG_HOME=/app/config
-         - UC_INTEGRATION_INTERFACE=0.0.0.0
-         - UC_INTEGRATION_HTTP_PORT=9090
-         # Uncomment to disable mDNS publishing if needed
-         # - UC_DISABLE_MDNS_PUBLISH=true
-       
-       # Volume for persistent configuration
-       volumes:
-         - spotify-config:/app/config
-       
-       # Health check
-       healthcheck:
-         test: ["CMD-SHELL", "curl -f http://localhost:9090/ || exit 1"]
-         interval: 30s
-         timeout: 10s
-         retries: 3
-         start_period: 30s
-       
-       # Logging configuration
-       logging:
-         driver: "json-file"
-         options:
-           max-size: "10m"
-           max-file: "3"
-
-   volumes:
-     spotify-config:
-       driver: local
-   ```
-
-3. **If using the pre-built image, edit the docker-compose.yml:**
-   ```bash
-   # Comment out the build line and uncomment the image line
-   sed -i 's/build: ./#build: ./' docker-compose.yml
-   sed -i 's/# image: mase1981/image: mase1981/' docker-compose.yml
-   ```
-
-4. **Start the container:**
-   ```bash
-   docker-compose up -d
-   ```
-
-5. **Check logs:**
-   ```bash
-   docker-compose logs -f spotify-integration
-   ```
-
-6. **Configure via Remote Two:**
-   - Open your Remote Two web configurator
-   - The integration should be auto-discovered via mDNS
-   - Follow the normal setup process:
-     - Enter your Spotify Developer App credentials
-     - Complete OAuth authentication
-     - Entities will be created automatically
-
-#### Manual Docker Run (Alternative)
-
+### Option 2: Docker (One-Line)
 ```bash
-docker run -d \
-  --name uc-spotify-integration \
-  --network host \
-  -v spotify-config:/app/config \
-  --restart unless-stopped \
-  mase1981/uc-intg-spotify:latest
+docker run -d --name uc-spotify --restart unless-stopped --network host -v spotify-config:/app/config -e UC_CONFIG_HOME=/app/config -e UC_INTEGRATION_INTERFACE=0.0.0.0 -e UC_INTEGRATION_HTTP_PORT=9090 ghcr.io/mase1981/uc-intg-spotify:latest
 ```
 
-#### Docker Setup Process
-
-1. **Start the container** - No environment variables needed
-2. **Discover the integration** on your Remote Two via the web configurator
-3. **Complete setup through Remote Two:**
-   - Enter your Spotify Developer App Client ID and Secret
-   - Select if you have Spotify Premium
-   - Complete OAuth authentication flow
-   - Configuration is automatically saved to the Docker volume
-4. **Entities will be created** and ready to use
-
-#### Docker Management
-
-**View logs:**
+### Option 3: Docker Compose
 ```bash
-docker-compose logs -f spotify-integration
-```
-
-**Restart the container:**
-```bash
-docker-compose restart spotify-integration
-```
-
-**Update to latest version:**
-```bash
-docker-compose pull
+git clone https://github.com/mase1981/uc-intg-spotify.git
+cd uc-intg-spotify
 docker-compose up -d
 ```
 
-**Stop and remove:**
+### Option 4: Development
 ```bash
-docker-compose down
+git clone https://github.com/mase1981/uc-intg-spotify.git
+cd uc-intg-spotify
+python3 -m venv venv
+source venv/bin/activate  # Linux/Mac
+# venv\Scripts\activate  # Windows
+pip install -r requirements.txt
+python -m uc_intg_spotify.driver
 ```
 
-**Reset configuration (start fresh setup):**
-```bash
-docker-compose down
-docker volume rm uc-spotify-integration_spotify-config
-docker-compose up -d
-```
+---
 
-#### Docker Volumes
+## ⚙️ Setup Process
 
-The container uses a named volume `spotify-config` to persist:
-- OAuth tokens
-- User preferences  
-- Spotify app credentials
-- Integration configuration
+### During Integration Setup
 
-This ensures your setup persists across container restarts and updates.
+#### Page 1: App Credentials
+1. Enter your **Spotify Client ID**
+2. Enter your **Spotify Client Secret**
+3. Select if you have **Spotify Premium**
+4. Click **Next**
 
-#### Docker Networking
+#### Page 2: Authentication
+1. **Click the Spotify authorization URL** (opens in browser)
+2. Log into your Spotify account
+3. Click **Agree** to authorize
+4. Browser shows "page not found" - **this is normal!**
+5. **Copy the authorization code** from browser address bar:
+   - Look for `code=...` in the URL
+   - Copy everything after `code=` (long string ~100+ characters)
+   - Or paste the entire callback URL
+6. **Paste code** into setup form
+7. Click **Finish**
 
-The integration uses host networking for:
-- **mDNS discovery** - Auto-discovery by Remote Two
-- **WebSocket communication** - Direct connection from Remote Two
-- **No port mapping needed** - Integration available at `http://docker-host:9090`
+#### Page 3: Completion
+- Two entities are created:
+  - **Spotify Player** (Media Player entity)
+  - **Spotify Remote** (Remote entity with controls)
+- ✅ Setup complete!
 
-#### Docker Troubleshooting
+### Important Setup Notes
 
-**Container won't start:**
-- Check Docker logs: `docker-compose logs spotify-integration`
-- Verify port 9090 is not already in use
-- Ensure Docker has network access
+⏱️ **Token may take time to process** - Spotify API can be slow during authorization. If redirect takes 10-30 seconds, this is normal - just wait for the "page not found" screen.
 
-**Integration not discovered by Remote Two:**
-- Ensure Remote Two and Docker host are on the same network
-- Check firewall settings on Docker host
-- Verify mDNS/Bonjour is working on your network
-- Try manual discovery using the Docker host IP
+🔄 **If setup fails:**
+- Verify Client ID/Secret are correct
+- Check Redirect URI is exactly `https://example.com/callback`
+- Ensure you copied the full authorization code
+- Try setup again
 
-**Setup fails:**
-- Check container logs during setup process
-- Verify your Spotify app redirect URI is exactly: `https://example.com/callback`
-- Ensure your Spotify Developer App credentials are correct
+---
 
-**Configuration lost after restart:**
-- Verify the Docker volume is properly mounted
-- Check volume permissions: `docker volume inspect uc-spotify-integration_spotify-config`
-
-**docker-compose.yml download issues:**
-- Try alternative download methods shown above
-- Verify your internet connection
-- Check if GitHub is accessible from your network
-- Use manual creation method if download fails
-
-## Setup Process
-
-### During Integration Setup:
-
-1. **App Credentials Page:**
-   - Enter your **Spotify Client ID** from the developer dashboard
-   - Enter your **Spotify Client Secret** from the developer dashboard  
-   - Select whether you have **Spotify Premium**
-   - Click **Next**
-
-2. **Authentication Page:**
-   - Click the provided Spotify authorization URL
-   - Log into your Spotify account and authorize the app
-   - Your browser will show "page not found" - **this is normal!**
-   - Copy the authorization code from your browser's address bar
-   - Paste it into the setup form
-   - Click **Finish**
-
-3. **Completion:**
-   - Two entities will be created:
-     - **Spotify Player** (Media Player entity)
-     - **Spotify Remote** (Remote entity with playback controls)
-
-## Usage
+## 🎮 Usage
 
 ### Media Player Entity
-- Shows currently playing track information
-- Displays album artwork
-- Shows playback progress
-- Premium users get playback control buttons
 
-### Remote Entity  
-- Physical button mappings for Premium users
+**Display Features (All Users):**
+- Currently playing track information
+- Album artwork
+- Real-time playback progress
+- Track duration and position
+
+**Control Features (Premium Only):**
+- Play/pause button
+- Next/previous track buttons
+- Volume control slider
+- Volume up/down buttons
+
+### Remote Entity
+
+**For Premium Users:**
+- Physical button mappings:
+  - **Play** → Play/Pause
+  - **Next** → Next Track
+  - **Prev** → Previous Track
+  - **Volume Up** → Increase Volume
+  - **Volume Down** → Decrease Volume
 - Custom UI with playback controls
-- Synchronized state with Spotify playback
+- Synchronized state with Spotify
 
-## Troubleshooting
+**For Free Users:**
+- Display-only entity
+- Shows message: "Spotify Premium required for playback control"
 
-### Common Issues
+---
 
-1. **"Client ID not configured" error:**
-   - Verify you entered the correct Client ID from your Spotify app
-   - Make sure there are no extra spaces or characters
+## 🎯 Activity Integration
 
-2. **"Authorization failed" error:**
-   - Check that your Client Secret is correct
-   - Ensure your Redirect URI is exactly `https://example.com/callback`
-   - Verify your Spotify app is not in "Development Mode" restrictions
+Use Spotify in UC Remote activities:
 
-3. **Premium Features Not Working:**
-   - Verify you selected "Premium User" during setup
-   - Ensure your Spotify account actually has Premium status
-   - Non-Premium users will get display-only functionality
+### Available Commands (Premium Only)
+```yaml
+# Playback Control
+- PLAY_PAUSE
+- NEXT
+- PREVIOUS
 
-4. **No Track Information:**
-   - Make sure Spotify is actively playing on one of your devices
-   - Check that the integration has valid authentication tokens
-   - Verify network connectivity
+# Volume Control  
+- VOLUME_UP
+- VOLUME_DOWN
+- Set volume to 50%
+```
+
+### Example Activity Sequences
+
+**Start Music Session:**
+```yaml
+1. Turn on receiver
+2. Set input to Spotify
+3. Wait 2 seconds
+4. Spotify: PLAY_PAUSE
+```
+
+**Quick Volume Adjustment:**
+```yaml
+1. Spotify: VOLUME_DOWN
+2. Spotify: VOLUME_DOWN
+3. Spotify: VOLUME_DOWN
+```
+
+---
+
+## 🔧 Configuration
+
+### Polling Interval
+
+Default: **30 seconds** (respects Spotify API rate limits)
+
+To change (edit `config.json`):
+```json
+{
+  "polling_interval": 30
+}
+```
+
+Range: 10-300 seconds
+
+### Docker Environment Variables
+```bash
+UC_CONFIG_HOME=/app/config          # Config directory
+UC_INTEGRATION_INTERFACE=0.0.0.0    # Listen interface
+UC_INTEGRATION_HTTP_PORT=9090       # HTTP port
+UC_DISABLE_MDNS_PUBLISH=false       # mDNS discovery
+```
+
+---
+
+## 🛠️ Troubleshooting
 
 ### Setup Issues
 
-1. **Invalid Client ID/Secret:**
-   - Double-check credentials from your Spotify Developer Dashboard
-   - Ensure no extra characters or spaces were copied
+#### "Client ID not configured"
+- ✅ Verify Client ID from Spotify Dashboard
+- ✅ Check for extra spaces or characters
+- ✅ Try copying again
 
-2. **Authorization Code Issues:**
-   - Make sure you're copying the full code from the URL
-   - You can paste either just the code or the entire callback URL
-   - The code is usually quite long (100+ characters)
+#### "Authorization failed"
+- ✅ Verify Client Secret is correct
+- ✅ Ensure Redirect URI is **exactly** `https://example.com/callback`
+- ✅ Check authorization code is complete
+- ✅ Code expires quickly - restart if needed
 
-### Logs
+#### Authorization Takes Long Time
+- ⏱️ Spotify API rate limiting - normal behavior
+- ⏱️ Can take 10-30 seconds to redirect
+- ⏱️ Wait for "page not found" page
+- ✅ Just be patient during authorization
 
-Check the Remote Two logs for detailed error information:
-- Authentication issues
-- API rate limiting
-- Network connectivity problems
+#### Invalid Authorization Code
+- ✅ Copy the full code (100+ characters)
+- ✅ Can paste just code OR entire callback URL
+- ✅ Don't include extra spaces
+- ✅ Code is case-sensitive
 
-## Development
+### Runtime Issues
 
-### Setup Development Environment
+#### No Track Information
+- ✅ Ensure Spotify is actively playing
+- ✅ Check integration is authenticated
+- ✅ Verify network connectivity
+- ✅ Check logs for errors
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/mase1981/uc-intg-spotify.git
-   cd uc-intg-spotify
-   ```
+#### Premium Features Not Working
+- ✅ Verify you selected "Premium" during setup
+- ✅ Confirm Spotify account is actually Premium
+- ✅ Free users get display-only functionality
+- ✅ Reconfigure if account upgraded
 
-2. **Create virtual environment:**
-   ```bash
-   python -m venv venv
-   venv\Scripts\activate  # Windows
-   # source venv/bin/activate  # Linux/Mac
-   ```
+#### Commands Return Error But Work
+- 🔧 **Fixed in v0.1.1** - Spotify API returns empty response
+- 🔧 Commands execute successfully, error is cosmetic
+- ✅ Update to latest version
 
-3. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
+#### Integration Shows ERROR State
+- ✅ Check logs for authentication errors
+- ✅ Token may have expired - reconfigure
+- ✅ Verify Spotify Developer App is active
+- ✅ Check network connectivity
 
-4. **Run in development mode:**
-   ```bash
-   python uc_intg_spotify/driver.py
-   ```
+### Docker Issues
 
-### Project Structure
+#### Container Won't Start
+- ✅ Check port 9090 is not in use
+- ✅ Verify Docker has network access
+- ✅ View logs: `docker logs uc-spotify`
 
+#### Integration Not Discovered
+- ✅ Ensure Remote and Docker on same network
+- ✅ Check firewall settings
+- ✅ Verify mDNS is working
+- ✅ Try manual discovery with IP
+
+#### Configuration Lost After Restart
+- ✅ Verify volume is mounted correctly
+- ✅ Check volume permissions
+- ✅ Inspect volume: `docker volume inspect spotify-config`
+
+---
+
+## 📊 Technical Details
+
+### Architecture
 ```
 uc-intg-spotify/
 ├── uc_intg_spotify/
-│   ├── __init__.py
-│   ├── driver.py          # Main integration driver
-│   ├── client.py          # Spotify API client
-│   ├── config.py          # Configuration management
-│   ├── setup.py           # OAuth setup handler
-│   ├── media_player.py    # Media player entity
-│   └── remote.py          # Remote entity
-├── .vscode/
-│   └── launch.json        # VSCode debug configuration
-├── .github/
-│   └── workflows/
-│       └── build.yml      # GitHub Actions build
-├── driver.json            # Integration metadata
-├── config.json            # Runtime configuration (created during setup)
-├── pyproject.toml         # Python project configuration
-├── requirements.txt       # Python dependencies
-└── README.md
+│   ├── __init__.py         # Version from driver.json
+│   ├── driver.py           # Main integration driver
+│   ├── client.py           # Spotify Web API client
+│   ├── config.py           # Configuration management
+│   ├── setup.py            # OAuth setup flow
+│   ├── media_player.py     # Media player entity
+│   └── remote.py           # Remote entity
+├── driver.json             # Integration metadata
+├── pyproject.toml          # Python project config
+├── requirements.txt        # Dependencies
+├── docker-compose.yml      # Docker deployment
+└── Dockerfile              # Docker image
 ```
 
-### Debugging
+### API Integration
 
-Use VSCode with the provided `launch.json` configuration:
-1. Open the project in VSCode
+**Protocol:** HTTPS REST API  
+**Authentication:** OAuth 2.0 Authorization Code Flow  
+**Token Management:** Automatic refresh  
+**Rate Limiting:** 30-second polling (configurable)
+
+### Spotify API Endpoints
+
+| Endpoint | Purpose |
+|----------|---------|
+| `/authorize` | OAuth authorization |
+| `/api/token` | Token exchange/refresh |
+| `/v1/me/player/currently-playing` | Get current track |
+| `/v1/me/player` | Get playback state |
+| `/v1/me/player/play` | Start playback |
+| `/v1/me/player/pause` | Pause playback |
+| `/v1/me/player/next` | Next track |
+| `/v1/me/player/previous` | Previous track |
+| `/v1/me/player/volume` | Set volume |
+
+### Security
+
+- ✅ OAuth 2.0 authentication
+- ✅ Tokens stored locally only
+- ✅ Client Secret filtered from logs
+- ✅ SSL certificate validation
+- ✅ User-owned credentials
+- ✅ No data collection
+
+---
+
+## 🔒 Privacy & Security
+
+### What This Integration Does
+
+- ✅ Stores credentials **locally only**
+- ✅ Communicates only with Spotify API
+- ✅ No third-party data sharing
+- ✅ You create and own the Developer App
+- ✅ Tokens stored in local config file
+
+### What This Integration Does NOT Do
+
+- ❌ Does not share your credentials
+- ❌ Does not store listening history
+- ❌ Does not collect any user data
+- ❌ Does not communicate with developer
+- ❌ Does not require internet beyond Spotify API
+
+### Your Responsibilities
+
+- 🔐 Secure your Spotify Developer App credentials
+- 📋 Comply with [Spotify Terms of Service](https://developer.spotify.com/terms)
+- 🔄 Rotate credentials periodically (recommended)
+- ⚠️ Use at your own risk
+
+---
+
+## 🧪 Development & Testing
+
+### Run in Development Mode
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python -m uc_intg_spotify.driver
+```
+
+### Debug with VSCode
+
+Use provided `.vscode/launch.json`:
+1. Open project in VSCode
 2. Go to Run and Debug (Ctrl+Shift+D)
 3. Select "Python: Spotify Integration"
-4. Press F5 to start debugging
+4. Press F5
 
-The integration will start on `http://localhost:9090` and publish via mDNS.
+### Build Release
+```bash
+# Tag version
+git tag v0.1.2
+git push origin v0.1.2
 
-### Key Implementation Notes
+# GitHub Actions builds automatically
+# Creates .tar.gz and Docker image
+```
 
-1. **No Hardcoded Credentials**: All Spotify app credentials come from user setup
-2. **Secure Storage**: Client secrets are stored in local config but filtered from logs
-3. **Premium Detection**: Setup flow includes Premium user detection to enable/disable features
-4. **Token Management**: Automatic OAuth token refresh handling
-5. **Error Handling**: Proper StatusCodes.OK for unsupported operations to avoid UI errors
+---
 
-## API Rate Limiting
+## 🤝 Contributing
 
-The integration polls Spotify's API every 30 seconds by default to respect rate limits:
-- Normal operation: 30-second intervals
-- Standby mode: 120-second intervals  
-- No polling when no entities are subscribed
-
-## Security Notes
-
-- **Your Spotify app credentials stay on your local device**
-- **No credentials are shared with the integration author**
-- **Each user creates their own Spotify Developer App**
-- **Client Secret is stored locally but filtered from debug logs**
-
-## Contributing
+We welcome contributions!
 
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+2. Create feature branch (`git checkout -b feature/amazing`)
+3. Commit changes (`git commit -m 'Add amazing feature'`)
+4. Push to branch (`git push origin feature/amazing`)
+5. Open Pull Request
 
-**Developer:** Meir Miyara (meir.miyara@gmail.com)
-**GitHub:** https://github.com/mase1981
+### Areas for Contribution
 
-## License
+- 🐛 Bug fixes
+- ✨ Feature enhancements
+- 📝 Documentation improvements
+- 🌍 Translations
+- 🧪 Tests
 
-This project is licensed under the Mozilla Public License 2.0 - see the LICENSE file for details.
+---
 
-## Legal Disclaimers
+## 💰 Support Development
+
+If you find this integration useful, consider supporting development:
+
+[![GitHub Sponsors](https://img.shields.io/badge/Sponsor-GitHub-pink?style=for-the-badge&logo=github)](https://github.com/sponsors/mase1981)
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/meirmiyara)
+[![PayPal](https://img.shields.io/badge/PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://paypal.me/mmiyara)
+
+Your support helps maintain this integration. Thank you! ❤️
+
+---
+
+## 📄 License
+
+This project is licensed under the **Mozilla Public License 2.0** - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 🙏 Credits
+
+- **Developer:** [Meir Miyara](https://www.linkedin.com/in/meirmiyara/)
+- **Framework:** [Unfolded Circle ucapi](https://github.com/unfoldedcircle/integration-python-library)
+- **Community:** Unfolded Circle Discord and Forum members
+
+---
+
+## 📞 Support & Links
+
+### Get Help
+
+- 🐛 [GitHub Issues](https://github.com/mase1981/uc-intg-spotify/issues) - Report bugs
+- 💬 [Discussions](https://github.com/mase1981/uc-intg-spotify/discussions) - Ask questions
+- 👥 [UC Community Forum](https://community.unfoldedcircle.com/) - General support
+- 💭 [Discord Server](https://discord.gg/zGVYf58) - Live chat
+
+### Documentation
+
+- 📖 [Spotify Web API](https://developer.spotify.com/documentation/web-api) - API reference
+- 📚 [UC Developer Docs](https://github.com/unfoldedcircle/integration-python-library) - Integration API
+- 🎓 [Setup Guide](https://github.com/mase1981/uc-intg-spotify/wiki) - Detailed instructions
+
+### Related Projects
+
+- 🎵 [UC Spotify Integration](https://github.com/mase1981/uc-intg-spotify) - This project
+- 📺 [Fire TV Integration](https://github.com/mase1981/uc-intg-firetv) - Amazon Fire TV
+- 🔊 [WiiM Integration](https://github.com/mase1981/uc-intg-wiim) - WiiM Audio
+- 🏠 [LG Horizon Integration](https://github.com/mase1981/uc-intg-horizon) - Set-top boxes
+
+---
+
+## ⚠️ Legal Disclaimers
 
 ### Third-Party Service Integration
-This integration is an independent, unofficial project that interfaces with Spotify's publicly available Web API. This project is:
 
-- **NOT sponsored, endorsed, or affiliated** with Spotify AB or any of its subsidiaries
-- **NOT an official Spotify product** or service
-- Developed independently using Spotify's public Web API documentation
+This integration is an **independent, unofficial project** that interfaces with Spotify's publicly available Web API:
+
+- ❌ **NOT** sponsored, endorsed, or affiliated with Spotify AB
+- ❌ **NOT** an official Spotify product or service
+- ✅ Developed independently using Spotify's public API
+- ✅ Open source under MPL-2.0 license
 
 ### Intellectual Property
-- **Spotify** is a trademark of Spotify AB
-- All Spotify-related trademarks, service marks, and logos are the property of Spotify AB
-- This project claims no ownership of Spotify's intellectual property
-- Album artwork, track information, and other content accessed through the API remain the property of their respective copyright holders
 
-### API Usage and Terms
-- Users must comply with [Spotify's Developer Terms of Service](https://developer.spotify.com/terms)
-- Users must comply with [Spotify's Web API Terms of Use](https://developer.spotify.com/terms)
-- This integration requires users to create their own Spotify Developer App
-- Usage of this integration is subject to Spotify's rate limiting and API policies
+- **Spotify** is a registered trademark of Spotify AB
+- All Spotify-related trademarks and logos are property of Spotify AB
+- This project claims no ownership of Spotify intellectual property
+- Album artwork and track information accessed via API remain property of copyright holders
 
-### User Responsibilities
-By using this integration, you acknowledge that:
+### Terms of Service
 
-- You are responsible for creating and managing your own Spotify Developer App
-- You are responsible for complying with all applicable terms of service
-- You use this software at your own risk
-- You are responsible for securing your own Spotify app credentials
-- The developer is not liable for any account restrictions, suspensions, or other consequences
+By using this integration, you agree to:
 
-### Data and Privacy
-- This integration does not store, collect, or transmit personal data beyond what is necessary for API functionality
-- Authentication tokens are stored locally on your device
-- No user data is shared with third parties
-- Spotify app credentials remain on your local device
-- Users should review Spotify's privacy policy for information about data handled by Spotify's services
+- ✅ Comply with [Spotify Developer Terms](https://developer.spotify.com/terms)
+- ✅ Comply with [Spotify Web API Terms](https://developer.spotify.com/terms)
+- ✅ Create and manage your own Spotify Developer App
+- ✅ Accept responsibility for your API usage
+- ✅ Use at your own risk
 
-**For questions about Spotify's services, terms, or policies, please contact Spotify directly.**
+### Liability & Warranty
 
-## Support
+- ⚠️ **No warranty provided** - software provided "as is"
+- ⚠️ Developer not liable for account restrictions or consequences
+- ⚠️ You are responsible for securing your credentials
+- ⚠️ You are responsible for compliance with Spotify policies
 
-- GitHub Issues: [Report bugs and request features](https://github.com/mase1981/uc-intg-spotify/issues)
-- Unfolded Circle Community: [Get help from the community](https://unfoldedcircle.com/community)
+### Data Privacy
 
-## Acknowledgments
+- 🔒 Integration does not collect user data
+- 🔒 Authentication tokens stored locally only
+- 🔒 No data transmitted to third parties
+- 🔒 Credentials remain on your device
+- 📋 Review [Spotify Privacy Policy](https://www.spotify.com/privacy) for API data handling
 
-- Unfolded Circle for the Remote Two/3 and integration API
-- Spotify for their comprehensive Web API
-- The UC community for testing and feedback
-- I Really do hope you will enjoy this integraion - Thank you again: **Meir Miyara**
+**For questions about Spotify services, terms, or policies, contact Spotify directly.**
+
+---
+
+<div align="center">
+
+Made with ❤️ by [Meir Miyara](https://www.linkedin.com/in/meirmiyara/)
+
+⭐ Star this repo if you find it useful!
+
+[Report Bug](https://github.com/mase1981/uc-intg-spotify/issues) · [Request Feature](https://github.com/mase1981/uc-intg-spotify/issues) · [Discussions](https://github.com/mase1981/uc-intg-spotify/discussions)
+
+**Version:** 0.1.1 | **Updated:** November 2024
+
+</div>
