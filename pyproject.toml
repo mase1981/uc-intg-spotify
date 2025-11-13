@@ -1,20 +1,20 @@
 [build-system]
-requires = ["setuptools>=65.0", "wheel"]
+requires = ["setuptools>=65.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "uc-intg-spotify"
-version = "0.1.1"
+dynamic = ["version"]
 description = "Spotify integration for Unfolded Circle Remote Two"
 authors = [
     {name = "Meir Miyara", email = "meir.miyara@gmail.com"}
 ]
 readme = "README.md"
-license = {file = "LICENSE"}
+license = {text = "MPL-2.0"}
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: End Users/Desktop",
-    "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
+    "License :: OSI Approved :: Mozilla Public License 2.0 (MPL-2.0)",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
@@ -34,3 +34,9 @@ dependencies = [
 Homepage = "https://github.com/mase1981/uc-intg-spotify"
 "Bug Reports" = "https://github.com/mase1981/uc-intg-spotify/issues"
 Source = "https://github.com/mase1981/uc-intg-spotify"
+
+[tool.setuptools]
+packages = ["uc_intg_spotify"]
+
+[tool.setuptools.dynamic]
+version = {attr = "uc_intg_spotify.__version__"}

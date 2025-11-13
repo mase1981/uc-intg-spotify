@@ -195,7 +195,17 @@ class SpotifyClient:
                 if 200 <= response.status < 300:
                     if response.status == 204:
                         return {}
-                    return await response.json()
+                    
+                    content_type = response.headers.get('Content-Type', '')
+                    content_length = response.headers.get('Content-Length', '0')
+                    
+                    if content_length == '0' or 'application/json' not in content_type:
+                        return {}
+                    
+                    try:
+                        return await response.json()
+                    except Exception:
+                        return {}
                 
                 _LOG.error("API request failed: %s %s - Status: %s", method, url, response.status)
                 return None
