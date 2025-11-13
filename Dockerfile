@@ -1,42 +1,20 @@
-FROM python:3.11-slim
+FROM python:3.11-slim-bullseye
 
-# Set working directory
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
+COPY ./requirements.txt requirements.txt
+RUN pip3 install --no-cache-dir --upgrade -r requirements.txt
+RUN mkdir /config
 
-# Copy requirements first for better caching
-COPY requirements.txt .
+ADD . .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+ENV UC_DISABLE_MDNS_PUBLISH="false"
+ENV UC_MDNS_LOCAL_HOSTNAME=""
 
-# Copy the application
-COPY uc_intg_spotify/ ./uc_intg_spotify/
-COPY driver.json .
+ENV UC_INTEGRATION_INTERFACE="0.0.0.0"
+ENV UC_INTEGRATION_HTTP_PORT="9090"
 
-# Create config directory
-RUN mkdir -p /app/config
+ENV UC_CONFIG_HOME="/config"
+LABEL org.opencontainers.image.source https://github.com/mase1981/uc-intg-spotify
 
-# Set environment variables
-ENV UC_CONFIG_HOME=/app/config
-ENV PYTHONPATH=/app
-ENV PYTHONUNBUFFERED=1
-
-# Expose the integration port
-EXPOSE 9090
-
-# Create non-root user for security
-RUN useradd --create-home --shell /bin/bash integration
-RUN chown -R integration:integration /app
-USER integration
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD curl -f http://localhost:9090/ || exit 1
-
-# Run the integration
-CMD ["python", "-m", "uc_intg_spotify.driver"]
+CMD ["python3", "-u", "uc_intg_spotify/driver.py"]

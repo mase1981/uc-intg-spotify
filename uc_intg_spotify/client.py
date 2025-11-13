@@ -195,7 +195,11 @@ class SpotifyClient:
                 if 200 <= response.status < 300:
                     if response.status == 204:
                         return {}
-                    return await response.json()
+                    
+                    try:
+                        return await response.json()
+                    except (aiohttp.ContentTypeError, ValueError):
+                        return {}
                 
                 _LOG.error("API request failed: %s %s - Status: %s", method, url, response.status)
                 return None
