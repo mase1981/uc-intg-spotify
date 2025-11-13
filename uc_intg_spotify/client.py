@@ -196,15 +196,9 @@ class SpotifyClient:
                     if response.status == 204:
                         return {}
                     
-                    content_type = response.headers.get('Content-Type', '')
-                    content_length = response.headers.get('Content-Length', '0')
-                    
-                    if content_length == '0' or 'application/json' not in content_type:
-                        return {}
-                    
                     try:
                         return await response.json()
-                    except Exception:
+                    except (aiohttp.ContentTypeError, ValueError):
                         return {}
                 
                 _LOG.error("API request failed: %s %s - Status: %s", method, url, response.status)
@@ -218,7 +212,7 @@ class SpotifyClient:
         """Get the currently playing track from Spotify."""
         data = await self._make_authenticated_request("GET", "/me/player/currently-playing")
         
-        if data is None or not data.get("item"):
+        if not data or not data.get("item"):
             return None
         
         track = data["item"]
@@ -240,7 +234,7 @@ class SpotifyClient:
     async def get_playback_state(self) -> Optional[Dict[str, Any]]:
         """Get current playback state including volume."""
         data = await self._make_authenticated_request("GET", "/me/player")
-        if data is None:
+        if not data:
             return {}
         
         return {
@@ -252,7 +246,7 @@ class SpotifyClient:
     async def play_pause(self) -> bool:
         """Toggle play/pause state."""
         current_data = await self._make_authenticated_request("GET", "/me/player")
-        if current_data is None:
+        if not current_data:
             return False
         
         is_playing = current_data.get("is_playing", False)
