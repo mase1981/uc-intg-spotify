@@ -107,7 +107,7 @@ Your support helps maintain this integration. Thank you! ❤️
 
 ### Option 2: Docker (One-Line)
 ```bash
-docker run -d --name uc-spotify --restart unless-stopped --network host -v spotify-config:/app/config -e UC_CONFIG_HOME=/app/config -e UC_INTEGRATION_INTERFACE=0.0.0.0 -e UC_INTEGRATION_HTTP_PORT=9090 ghcr.io/mase1981/uc-intg-spotify:latest
+docker run -d --name uc-spotify --restart unless-stopped --network host -v spotify-config:/app/config -e UC_CONFIG_HOME=/app/config -e UC_INTEGRATION_INTERFACE=0.0.0.0 -e UC_INTEGRATION_HTTP_PORT=9090 -e PYTHONPATH=/app ghcr.io/mase1981/uc-intg-spotify:latest
 ```
 
 ### Option 3: Docker Compose
