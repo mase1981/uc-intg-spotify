@@ -1,4 +1,4 @@
-ucapi==0.5.1
+ucapi==0.5.2
 websockets==14.1
 aiohttp>=3.8.0
 pyee>=11.0.0

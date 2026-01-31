@@ -142,6 +142,9 @@ class SpotifyRemote:
         elif command == "VOLUME_UP":
             current_state = await self._client.get_playback_state()
             if current_state:
+                if not current_state.get("supports_volume", False):
+                    _LOG.info("Active device does not support volume control")
+                    return ucapi.StatusCodes.NOT_IMPLEMENTED
                 current_volume = current_state.get("volume_percent", 50)
                 new_volume = min(100, current_volume + 10)
                 success = await self._client.set_volume(new_volume)
@@ -150,6 +153,9 @@ class SpotifyRemote:
         elif command == "VOLUME_DOWN":
             current_state = await self._client.get_playback_state()
             if current_state:
+                if not current_state.get("supports_volume", False):
+                    _LOG.info("Active device does not support volume control")
+                    return ucapi.StatusCodes.NOT_IMPLEMENTED
                 current_volume = current_state.get("volume_percent", 50)
                 new_volume = max(0, current_volume - 10)
                 success = await self._client.set_volume(new_volume)

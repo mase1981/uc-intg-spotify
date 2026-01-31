@@ -236,11 +236,13 @@ class SpotifyClient:
         data = await self._make_authenticated_request("GET", "/me/player")
         if not data:
             return {}
-        
+
+        device = data.get("device", {})
         return {
             "is_playing": data.get("is_playing", False),
-            "volume_percent": data.get("device", {}).get("volume_percent", 50),
-            "device_name": data.get("device", {}).get("name", "Unknown"),
+            "volume_percent": device.get("volume_percent", 50),
+            "device_name": device.get("name", "Unknown"),
+            "supports_volume": device.get("supports_volume", False),
         }
 
     async def play_pause(self) -> bool:
@@ -276,9 +278,15 @@ class SpotifyClient:
 
     async def set_volume(self, volume_percent: int) -> bool:
         """Set playback volume (0-100)."""
+        # Check if device supports volume control
+        state = await self.get_playback_state()
+        if state and not state.get("supports_volume", False):
+            _LOG.warning("Active device does not support volume control")
+            return False
+
         volume_percent = max(0, min(100, volume_percent))
         result = await self._make_authenticated_request(
-            "PUT", 
+            "PUT",
             f"/me/player/volume?volume_percent={volume_percent}"
         )
         return result is not None
