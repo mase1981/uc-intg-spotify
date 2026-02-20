@@ -1,9 +1,9 @@
 {
-  "driver_id": "spotify",
+  "driver_id": "spotifyPremium",
   "version": "1.0.5",
   "min_core_api": "0.3.1",
   "name": {
-    "en": "Spotify"
+    "en": "Spotify Premium"
   },
   "description": {
     "en": "Control Spotify playback and view currently playing track information."
@@ -17,7 +17,7 @@
   "documentation": "https://github.com/mase1981/uc-intg-spotify/blob/main/README.md",
   "setup_data_schema": {
     "title": {
-      "en": "Spotify Setup"
+      "en": "Spotify Premuim Setup"
     },
     "settings": [
       {
@@ -54,17 +54,6 @@
           "text": {
             "value": "",
             "placeholder": "Enter your Spotify app Client Secret"
-          }
-        }
-      },
-      {
-        "id": "is_premium",
-        "label": {
-          "en": "Do you have Spotify Premium?"
-        },
-        "field": {
-          "checkbox": {
-            "value": false
           }
         }
       }

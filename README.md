@@ -13,14 +13,16 @@ Control Spotify playback and view currently playing track information on your Un
 [![PayPal](https://img.shields.io/badge/PayPal-donate-blue.svg?style=flat-square)](https://paypal.me/mmiyara)
 [![Github Sponsors](https://img.shields.io/badge/GitHub%20Sponsors-30363D?&logo=GitHub-Sponsors&logoColor=EA4AAA&style=flat-square)](https://github.com/sponsors/mase1981)
 
-
 ## Features
 
-This integration provides comprehensive Spotify control directly from your Unfolded Circle Remote, with different feature sets for Free and Premium users.
+This integration provides comprehensive Spotify control directly from your Unfolded Circle Remote for Spotify Premium Account users.
 
-**IMPORTANT:** Requires creating your own Spotify Developer App (free, 5 minutes). Full setup instructions below.
+**IMPORTANT:** Requires a Spotify Premium Account and creating your own Spotify Developer App (free to create, 5 minutes). Full setup instructions below.
+
+**NOTE:** The Spotify API had limited support for Free Accounts which removed in February, 2026. That is why this integration can not be used with a Free Account.
 
 ---
+
 ## ❤️ Support Development ❤️
 
 If you find this integration useful, consider supporting development:
@@ -29,35 +31,19 @@ If you find this integration useful, consider supporting development:
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/meirmiyara)
 [![PayPal](https://img.shields.io/badge/PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://paypal.me/mmiyara)
 
-Your support helps maintain this integration. Thank you! ❤️
----
+## Your support helps maintain this integration. Thank you! ❤️
 
-### 🎵 **For All Users (Free & Premium)**
+### ⚡ **For Spotify Premium Users Only**
 
 - **Real-time Track Display** - Title, artist, album with artwork
 - **Playback Progress** - Live position and duration tracking
 - **Album Artwork** - High-quality cover art display
 - **State Updates** - Every 30 seconds (configurable)
-
-### ⚡ **For Spotify Premium Users Only**
-
 - **Play/Pause Control** - Toggle playback
 - **Track Navigation** - Next/previous track
 - **Volume Control** - Set volume or use up/down
 - **Physical Button Mapping** - UC Remote hardware buttons
 - **Remote Entity** - Custom UI with playback controls
-
-### Feature Comparison
-
-| Feature | Free Users | Premium Users |
-|---------|------------|---------------|
-| Track Display | ✅ Full | ✅ Full |
-| Album Artwork | ✅ Yes | ✅ Yes |
-| Playback Progress | ✅ Yes | ✅ Yes |
-| Play/Pause Control | ❌ No | ✅ Yes |
-| Next/Previous | ❌ No | ✅ Yes |
-| Volume Control | ❌ No | ✅ Yes |
-| Button Mapping | ❌ No | ✅ Yes |
 
 ### **Protocol Requirements**
 
@@ -81,7 +67,7 @@ Your support helps maintain this integration. Thank you! ❤️
 **BEFORE INSTALLATION:** You must create a Spotify Developer App to get your Client ID and Client Secret.
 
 1. Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
-2. Log in with your Spotify account
+2. Log in with your Premium Spotify account
 3. Click **"Create App"**
 4. Fill in the details:
    - **App Name**: `UC Remote Integration` (or any name)
@@ -92,14 +78,16 @@ Your support helps maintain this integration. Thank you! ❤️
 6. Note your **Client ID** and **Client Secret** (click "Show Client Secret")
 
 #### Important Notes:
+
 - ✅ Keep credentials secure - don't share them
 - ✅ Redirect URI must be **exactly** `https://example.com/callback`
-- ✅ Both Free and Premium accounts can create apps
+- ✅ Only Premium accounts can create apps
 - ✅ No recurring costs - one-time setup
 
 ## Installation
 
 ### Option 1: Remote Web Interface (Recommended)
+
 1. Navigate to the [**Releases**](https://github.com/mase1981/uc-intg-spotify/releases) page
 2. Download the latest `uc-intg-spotify-<version>-aarch64.tar.gz` file
 3. Open your remote's web interface (`http://your-remote-ip`)
@@ -113,6 +101,7 @@ The integration is available as a pre-built Docker image from GitHub Container R
 **Image**: `ghcr.io/mase1981/uc-intg-spotify:latest`
 
 **Docker Compose:**
+
 ```yaml
 services:
   uc-intg-spotify:
@@ -130,6 +119,7 @@ services:
 ```
 
 **Docker Run:**
+
 ```bash
 docker run -d --name uc-spotify --restart unless-stopped --network host -v spotify-config:/app/config -e UC_CONFIG_HOME=/app/config -e UC_INTEGRATION_INTERFACE=0.0.0.0 -e UC_INTEGRATION_HTTP_PORT=9090 -e PYTHONPATH=/app ghcr.io/mase1981/uc-intg-spotify:latest
 ```
@@ -161,6 +151,7 @@ docker run -d --name uc-spotify --restart unless-stopped --network host -v spoti
 ### Step 3: Completion
 
 Two entities are created:
+
 - **Spotify Player** (Media Player entity)
 - **Spotify Remote** (Remote entity with controls)
 
@@ -168,13 +159,15 @@ Two entities are created:
 
 ### Media Player Entity
 
-**Display Features (All Users)**:
+**Display Features**:
+
 - Currently playing track information
 - Album artwork
 - Real-time playback progress
 - Track duration and position
 
-**Control Features (Premium Only)**:
+**Control Features**:
+
 - Play/pause button
 - Next/previous track buttons
 - Volume control slider
@@ -182,7 +175,6 @@ Two entities are created:
 
 ### Remote Entity
 
-**For Premium Users**:
 - Physical button mappings:
   - **Play** → Play/Pause
   - **Next** → Next Track
@@ -191,10 +183,6 @@ Two entities are created:
   - **Volume Down** → Decrease Volume
 - Custom UI with playback controls
 - Synchronized state with Spotify
-
-**For Free Users**:
-- Display-only entity
-- Shows message: "Spotify Premium required for playback control"
 
 ## Credits
 
