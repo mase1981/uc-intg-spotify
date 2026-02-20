@@ -27,7 +27,6 @@ class SpotifyMediaPlayer:
         self._config: SpotifyConfig = client._config if client else None
         self._polling_task: Optional[asyncio.Task] = None
         
-        # Base features for all users
         features = [
             Features.ON_OFF,
             Features.MEDIA_DURATION,
@@ -36,21 +35,13 @@ class SpotifyMediaPlayer:
             Features.MEDIA_ARTIST,
             Features.MEDIA_ALBUM,
             Features.MEDIA_IMAGE_URL,
-            Features.MEDIA_TYPE
+            Features.MEDIA_TYPE,
+            Features.PLAY_PAUSE,
+            Features.NEXT,
+            Features.PREVIOUS,
+            Features.VOLUME,
+            Features.VOLUME_UP_DOWN,
         ]
-        
-        # Add control features for Premium users
-        if self._config and self._config.is_premium_user():
-            _LOG.info("User has Spotify Premium - enabling playback controls")
-            features.extend([
-                Features.PLAY_PAUSE,
-                Features.NEXT,
-                Features.PREVIOUS,
-                Features.VOLUME,
-                Features.VOLUME_UP_DOWN,
-            ])
-        else:
-            _LOG.info("User has Spotify Free - display only mode")
         
         attributes = {
             Attributes.STATE: States.OFF,
@@ -118,27 +109,11 @@ class SpotifyMediaPlayer:
             return ucapi.StatusCodes.SERVICE_UNAVAILABLE
         
         try:
-            # Handle ON/OFF commands for all users
             if cmd_id == Commands.ON:
                 return await self._handle_on()
             elif cmd_id == Commands.OFF:
                 return await self._handle_off()
-            
-            # Check Premium status for control commands
-            if not self._config.is_premium_user():
-                premium_commands = [
-                    Commands.PLAY_PAUSE, Commands.NEXT, Commands.PREVIOUS,
-                    Commands.VOLUME, Commands.VOLUME_UP, Commands.VOLUME_DOWN,
-                    Commands.MUTE_TOGGLE, Commands.MUTE, Commands.UNMUTE,
-                    "shuffle", "repeat", "seek", "stop", "fast_forward", "rewind"
-                ]
-                
-                if cmd_id in premium_commands:
-                    _LOG.info("Command %s requires Spotify Premium - ignoring for Free user", cmd_id)
-                    return ucapi.StatusCodes.OK
-            
-            # Handle Premium commands
-            if cmd_id == Commands.PLAY_PAUSE:
+            elif cmd_id == Commands.PLAY_PAUSE:
                 return await self._handle_play_pause()
             elif cmd_id == Commands.NEXT:
                 return await self._handle_next()
@@ -200,10 +175,6 @@ class SpotifyMediaPlayer:
     
     async def _handle_on(self) -> ucapi.StatusCodes:
         """Handle turn on command."""
-        if not self._config.is_premium_user():
-            _LOG.info("ON command acknowledged for Free user (display only)")
-            return ucapi.StatusCodes.OK
-
         success = await self._client.play()
         if success:
             self._api.configured_entities.update_attributes(self.entity.id, {Attributes.STATE: States.PLAYING})
@@ -211,10 +182,6 @@ class SpotifyMediaPlayer:
     
     async def _handle_off(self) -> ucapi.StatusCodes:
         """Handle turn off command."""
-        if not self._config.is_premium_user():
-            _LOG.info("OFF command acknowledged for Free user (display only)")
-            return ucapi.StatusCodes.OK
-
         success = await self._client.pause()
         if success:
             self._api.configured_entities.update_attributes(self.entity.id, {Attributes.STATE: States.PAUSED})

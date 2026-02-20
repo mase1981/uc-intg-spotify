@@ -48,20 +48,10 @@ class SpotifySetup:
         if msg.setup_data:
             client_id = msg.setup_data.get("client_id", "").strip()
             client_secret = msg.setup_data.get("client_secret", "").strip()
-            is_premium_raw = msg.setup_data.get("is_premium", False)
-            
-            # Convert checkbox value to boolean
-            if isinstance(is_premium_raw, str):
-                is_premium = is_premium_raw.lower() in ("true", "1", "yes", "on")
-            else:
-                is_premium = bool(is_premium_raw)
-            
+
             if client_id and client_secret:
                 _LOG.info("App credentials provided, proceeding to authentication")
-                
                 self._config.set_app_credentials(client_id, client_secret)
-                self._config.set_premium_user(is_premium)
-                
                 return await self._show_authentication_screen()
             else:
                 _LOG.error("Missing client ID or client secret in setup data")

@@ -118,28 +118,7 @@ class SpotifyConfig:
         """Check if the access token is expired."""
         expires_at = self._config_data.get("token_expires_at", 0)
         return int(time.time()) >= expires_at
-    
-    def set_premium_user(self, is_premium: bool) -> bool:
-        """
-        Set whether the user has Spotify Premium.
-        
-        Args:
-            is_premium: True if user has Premium, False otherwise
-            
-        Returns:
-            True if saved successfully, False otherwise
-        """
-        try:
-            self._config_data["is_premium"] = is_premium
-            return self._save_config()
-        except Exception as e:
-            _LOG.error("Error setting premium status: %s", e)
-            return False
-    
-    def is_premium_user(self) -> bool:
-        """Check if the user has Spotify Premium."""
-        return self._config_data.get("is_premium", False)
-    
+
     def get_polling_interval(self) -> int:
         """Get the polling interval in seconds."""
         return self._config_data.get("polling_interval", 30)

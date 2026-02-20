@@ -10,7 +10,7 @@ from typing import Any, Dict
 
 import ucapi
 from ucapi.remote import Commands, Features, States
-from ucapi.ui import Buttons, Size, create_btn_mapping, create_ui_icon, create_ui_text, UiPage
+from ucapi.ui import Buttons, Size, create_btn_mapping, create_ui_icon, UiPage
 
 from uc_intg_spotify.client import SpotifyClient
 from uc_intg_spotify.config import SpotifyConfig
@@ -27,30 +27,23 @@ class SpotifyRemote:
         self._client = client
         self._config: SpotifyConfig = client._config if client else None
         
-        features = [Features.ON_OFF]
-        if self._config and self._config.is_premium_user():
-            features.append(Features.SEND_CMD)
-        
-        simple_commands = []
-        button_mapping = []
-        
-        # Add premium features for premium users
-        if self._config and self._config.is_premium_user():
-            simple_commands = [
-                "PLAY_PAUSE",
-                "NEXT",
-                "PREVIOUS",
-                "VOLUME_UP", 
-                "VOLUME_DOWN"
-            ]
-            
-            button_mapping = [
-                create_btn_mapping(Buttons.PLAY, "PLAY_PAUSE"),
-                create_btn_mapping(Buttons.NEXT, "NEXT"), 
-                create_btn_mapping(Buttons.PREV, "PREVIOUS"),
-                create_btn_mapping(Buttons.VOLUME_UP, "VOLUME_UP"),
-                create_btn_mapping(Buttons.VOLUME_DOWN, "VOLUME_DOWN"),
-            ]
+        features = [Features.ON_OFF, Features.SEND_CMD]
+
+        simple_commands = [
+            "PLAY_PAUSE",
+            "NEXT",
+            "PREVIOUS",
+            "VOLUME_UP",
+            "VOLUME_DOWN"
+        ]
+
+        button_mapping = [
+            create_btn_mapping(Buttons.PLAY, "PLAY_PAUSE"),
+            create_btn_mapping(Buttons.NEXT, "NEXT"),
+            create_btn_mapping(Buttons.PREV, "PREVIOUS"),
+            create_btn_mapping(Buttons.VOLUME_UP, "VOLUME_UP"),
+            create_btn_mapping(Buttons.VOLUME_DOWN, "VOLUME_DOWN"),
+        ]
         
         ui_pages = self._create_ui_pages()
         
@@ -70,20 +63,14 @@ class SpotifyRemote:
     def _create_ui_pages(self) -> list[UiPage]:
         """Create UI pages for the remote."""
         pages = []
-        
+
         main_page = UiPage(page_id="main", name="Spotify Controls", grid=Size(4, 6))
-        
-        if self._config and self._config.is_premium_user():
-            main_page.add(create_ui_icon("uc:play-pause", 1, 1, Size(2, 1), "PLAY_PAUSE"))
-            main_page.add(create_ui_icon("uc:backward", 0, 2, Size(1, 1), "PREVIOUS"))
-            main_page.add(create_ui_icon("uc:forward", 3, 2, Size(1, 1), "NEXT"))
-            main_page.add(create_ui_icon("uc:volume-high", 1, 3, Size(1, 1), "VOLUME_UP"))
-            main_page.add(create_ui_icon("uc:volume-low", 2, 3, Size(1, 1), "VOLUME_DOWN"))
-        else:
-            main_page.add(create_ui_text("Spotify Premium required", 0, 1, Size(4, 1)))
-            main_page.add(create_ui_text("for playback control", 0, 2, Size(4, 1)))
-            main_page.add(create_ui_text("Display only mode", 0, 4, Size(4, 1)))
-        
+        main_page.add(create_ui_icon("uc:play-pause", 1, 1, Size(2, 1), "PLAY_PAUSE"))
+        main_page.add(create_ui_icon("uc:backward", 0, 2, Size(1, 1), "PREVIOUS"))
+        main_page.add(create_ui_icon("uc:forward", 3, 2, Size(1, 1), "NEXT"))
+        main_page.add(create_ui_icon("uc:volume-high", 1, 3, Size(1, 1), "VOLUME_UP"))
+        main_page.add(create_ui_icon("uc:volume-low", 2, 3, Size(1, 1), "VOLUME_DOWN"))
+
         pages.append(main_page)
         return pages
     
@@ -122,15 +109,11 @@ class SpotifyRemote:
     
     async def _handle_send_cmd(self, params: dict[str, Any] | None) -> ucapi.StatusCodes:
         """Handle send command."""
-        if not self._config.is_premium_user():
-            _LOG.info("Send command requires Spotify Premium")
-            return ucapi.StatusCodes.NOT_IMPLEMENTED
-        
         if not params or "command" not in params:
             return ucapi.StatusCodes.BAD_REQUEST
-        
+
         command = params["command"]
-        _LOG.debug("Executing remote command for Premium user: %s", command)
+        _LOG.debug("Executing remote command: %s", command)
         
         success = False
         if command == "PLAY_PAUSE":

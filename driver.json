@@ -1,6 +1,6 @@
 {
   "driver_id": "spotify",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "min_core_api": "0.3.1",
   "name": {
     "en": "Spotify"
@@ -28,7 +28,7 @@
         "field": {
           "label": {
             "value": {
-              "en": "Before proceeding, you need to create a Spotify Developer App:\n\n1. Go to https://developer.spotify.com/dashboard\n2. Log in with your Spotify account\n3. Click 'Create App'\n4. App Name: 'UC Remote Integration'\n5. App Description: 'Unfolded Circle Remote integration'\n6. Redirect URI: https://example.com/callback\n7. Check 'Web API' and save\n8. Copy your Client ID and Client Secret below"
+              "en": "IMPORTANT: Spotify Premium is required (API no longer supports Free accounts as of Feb 2026).\n\nCreate a Spotify Developer App:\n\n1. Go to https://developer.spotify.com/dashboard\n2. Log in with your Premium Spotify account\n3. Click 'Create App'\n4. App Name: 'UC Remote Integration'\n5. App Description: 'Unfolded Circle Remote integration'\n6. Redirect URI: https://example.com/callback\n7. Check 'Web API' and save\n8. Copy your Client ID and Client Secret below"
             }
           }
         }
@@ -54,17 +54,6 @@
           "text": {
             "value": "",
             "placeholder": "Enter your Spotify app Client Secret"
-          }
-        }
-      },
-      {
-        "id": "is_premium",
-        "label": {
-          "en": "Do you have Spotify Premium?"
-        },
-        "field": {
-          "checkbox": {
-            "value": false
           }
         }
       }
