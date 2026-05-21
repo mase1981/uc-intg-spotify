@@ -26,6 +26,8 @@ class SpotifyMediaPlayer:
         self._client = client
         self._config: SpotifyConfig = client._config if client else None
         self._polling_task: Optional[asyncio.Task] = None
+        if self._client:
+            self._client.set_playback_state_changed_callback(self.refresh_playback_state)
         
         features = [
             Features.ON_OFF,
@@ -88,17 +90,21 @@ class SpotifyMediaPlayer:
         while True:
             try:
                 if self._client.is_authenticated():
-                    track_data = await self._client.get_currently_playing()
-                    if track_data:
-                        await self.update_current_track(track_data)
-                    else:
-                        await self.clear_current_track()
+                    await self.refresh_playback_state()
                 else:
                     _LOG.debug("Polling skipped: client not authenticated.")
             except Exception as e:
                 _LOG.error(f"Error during polling: {e}", exc_info=True)
             
             await asyncio.sleep(interval_seconds)
+
+    async def refresh_playback_state(self) -> None:
+        """Refresh playback state immediately."""
+        track_data = await self._client.get_currently_playing()
+        if track_data:
+            await self.update_current_track(track_data)
+        else:
+            await self.clear_current_track()
 
     async def cmd_handler(self, entity: ucapi.Entity, cmd_id: str, params: dict[str, Any] | None) -> ucapi.StatusCodes:
         """Handle media player commands."""
