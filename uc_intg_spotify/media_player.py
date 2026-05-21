@@ -16,6 +16,7 @@ from uc_intg_spotify.config import SpotifyConfig
 
 _LOG = logging.getLogger(__name__)
 COMMAND_REFRESH_DELAY_SECONDS = 2.0
+TRACK_END_REFRESH_SETTLE_SECONDS = 1.0
 
 
 class SpotifyMediaPlayer:
@@ -28,6 +29,7 @@ class SpotifyMediaPlayer:
         self._config: SpotifyConfig = client._config if client else None
         self._polling_task: Optional[asyncio.Task] = None
         self._command_refresh_task: Optional[asyncio.Task] = None
+        self._track_end_refresh_task: Optional[asyncio.Task] = None
         if self._client:
             self._client.set_playback_state_changed_callback(self.schedule_playback_state_refresh)
         
@@ -93,6 +95,13 @@ class SpotifyMediaPlayer:
             except asyncio.CancelledError:
                 pass
         self._command_refresh_task = None
+        if self._track_end_refresh_task and not self._track_end_refresh_task.done():
+            self._track_end_refresh_task.cancel()
+            try:
+                await self._track_end_refresh_task
+            except asyncio.CancelledError:
+                pass
+        self._track_end_refresh_task = None
         
     async def _poll_playback_state(self, interval_seconds: int):
         """Periodically poll for playback state."""
@@ -131,6 +140,41 @@ class SpotifyMediaPlayer:
             raise
         except Exception as e:
             _LOG.error("Error during delayed playback refresh: %s", e, exc_info=True)
+
+    def schedule_track_end_refresh(self, track_data: Dict[str, Any]) -> None:
+        """Schedule a refresh shortly after the current track should end."""
+        if self._track_end_refresh_task and not self._track_end_refresh_task.done():
+            self._track_end_refresh_task.cancel()
+            self._track_end_refresh_task = None
+
+        if not track_data.get("is_playing", False):
+            return
+
+        duration_ms = track_data.get("duration_ms", 0)
+        progress_ms = track_data.get("progress_ms", 0)
+        if duration_ms <= 0:
+            return
+
+        remaining_seconds = max((duration_ms - progress_ms) / 1000, 0)
+        if remaining_seconds <= 0:
+            remaining_seconds = TRACK_END_REFRESH_SETTLE_SECONDS
+
+        delay_seconds = remaining_seconds + TRACK_END_REFRESH_SETTLE_SECONDS
+        self._track_end_refresh_task = asyncio.create_task(
+            self._refresh_when_track_ends(delay_seconds)
+        )
+
+    async def _refresh_when_track_ends(self, delay_seconds: float) -> None:
+        """Refresh playback after the current track should have advanced."""
+        try:
+            await asyncio.sleep(delay_seconds)
+            if self._track_end_refresh_task is asyncio.current_task():
+                self._track_end_refresh_task = None
+            await self.refresh_playback_state()
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            _LOG.error("Error refreshing playback at track end: %s", e, exc_info=True)
 
     async def cmd_handler(self, entity: ucapi.Entity, cmd_id: str, params: dict[str, Any] | None) -> ucapi.StatusCodes:
         """Handle media player commands."""
@@ -244,6 +288,8 @@ class SpotifyMediaPlayer:
             if changed_attrs:
                 self._api.configured_entities.update_attributes(self.entity.id, changed_attrs)
                 _LOG.debug(f"Updated track info: {changed_attrs}")
+
+            self.schedule_track_end_refresh(track_data)
             
         except Exception as e:
             _LOG.error("Error updating current track: %s", e)
@@ -264,6 +310,10 @@ class SpotifyMediaPlayer:
             if self.entity.attributes.get(Attributes.STATE) != States.OFF:
                 self._api.configured_entities.update_attributes(self.entity.id, attributes)
                 _LOG.debug("Cleared current track information")
+
+            if self._track_end_refresh_task and not self._track_end_refresh_task.done():
+                self._track_end_refresh_task.cancel()
+            self._track_end_refresh_task = None
             
         except Exception as e:
             _LOG.error("Error clearing current track: %s", e)
