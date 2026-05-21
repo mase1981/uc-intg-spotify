@@ -9,7 +9,7 @@ import asyncio
 import base64
 import logging
 import ssl
-from typing import Any, Dict, Optional
+from typing import Any, Awaitable, Callable, Dict, Optional
 
 import aiohttp
 import certifi
@@ -29,9 +29,24 @@ class SpotifyClient:
         self._config = config
         self._session: Optional[aiohttp.ClientSession] = None
         self._token_refresh_lock = asyncio.Lock()
+        self._playback_state_changed_callback: Optional[Callable[[], Awaitable[None]]] = None
         self.redirect_uri = "https://example.com/callback"
         
         _LOG.info("Spotify client initialized")
+
+    def set_playback_state_changed_callback(self, callback: Callable[[], Awaitable[None]]) -> None:
+        """Register a callback to refresh local state after playback changes."""
+        self._playback_state_changed_callback = callback
+
+    async def _notify_playback_state_changed(self) -> None:
+        """Notify listener that playback state should be refreshed."""
+        if not self._playback_state_changed_callback:
+            return
+
+        try:
+            await self._playback_state_changed_callback()
+        except Exception as e:
+            _LOG.error("Error refreshing playback state after command: %s", e)
         
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create HTTP session with proper SSL context."""
@@ -269,12 +284,18 @@ class SpotifyClient:
     async def next_track(self) -> bool:
         """Skip to next track."""
         result = await self._make_authenticated_request("POST", "/me/player/next")
-        return result is not None
+        success = result is not None
+        if success:
+            await self._notify_playback_state_changed()
+        return success
     
     async def previous_track(self) -> bool:
         """Skip to previous track."""
         result = await self._make_authenticated_request("POST", "/me/player/previous")
-        return result is not None
+        success = result is not None
+        if success:
+            await self._notify_playback_state_changed()
+        return success
 
     async def set_volume(self, volume_percent: int) -> bool:
         """Set playback volume (0-100)."""

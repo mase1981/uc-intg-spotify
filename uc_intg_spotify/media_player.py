@@ -15,6 +15,7 @@ from uc_intg_spotify.client import SpotifyClient
 from uc_intg_spotify.config import SpotifyConfig
 
 _LOG = logging.getLogger(__name__)
+COMMAND_REFRESH_DELAY_SECONDS = 2.0
 
 
 class SpotifyMediaPlayer:
@@ -26,6 +27,9 @@ class SpotifyMediaPlayer:
         self._client = client
         self._config: SpotifyConfig = client._config if client else None
         self._polling_task: Optional[asyncio.Task] = None
+        self._command_refresh_task: Optional[asyncio.Task] = None
+        if self._client:
+            self._client.set_playback_state_changed_callback(self.schedule_playback_state_refresh)
         
         features = [
             Features.ON_OFF,
@@ -82,23 +86,51 @@ class SpotifyMediaPlayer:
                 pass
             _LOG.info("Stopped polling Spotify.")
         self._polling_task = None
+        if self._command_refresh_task and not self._command_refresh_task.done():
+            self._command_refresh_task.cancel()
+            try:
+                await self._command_refresh_task
+            except asyncio.CancelledError:
+                pass
+        self._command_refresh_task = None
         
     async def _poll_playback_state(self, interval_seconds: int):
         """Periodically poll for playback state."""
         while True:
             try:
                 if self._client.is_authenticated():
-                    track_data = await self._client.get_currently_playing()
-                    if track_data:
-                        await self.update_current_track(track_data)
-                    else:
-                        await self.clear_current_track()
+                    await self.refresh_playback_state()
                 else:
                     _LOG.debug("Polling skipped: client not authenticated.")
             except Exception as e:
                 _LOG.error(f"Error during polling: {e}", exc_info=True)
             
             await asyncio.sleep(interval_seconds)
+
+    async def refresh_playback_state(self) -> None:
+        """Refresh playback state immediately."""
+        track_data = await self._client.get_currently_playing()
+        if track_data:
+            await self.update_current_track(track_data)
+        else:
+            await self.clear_current_track()
+
+    async def schedule_playback_state_refresh(self) -> None:
+        """Refresh playback state after Spotify has had time to settle."""
+        if self._command_refresh_task and not self._command_refresh_task.done():
+            self._command_refresh_task.cancel()
+
+        self._command_refresh_task = asyncio.create_task(self._delayed_playback_state_refresh())
+
+    async def _delayed_playback_state_refresh(self) -> None:
+        """Run a delayed refresh for commands whose visible state changes asynchronously."""
+        try:
+            await asyncio.sleep(COMMAND_REFRESH_DELAY_SECONDS)
+            await self.refresh_playback_state()
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            _LOG.error("Error during delayed playback refresh: %s", e, exc_info=True)
 
     async def cmd_handler(self, entity: ucapi.Entity, cmd_id: str, params: dict[str, Any] | None) -> ucapi.StatusCodes:
         """Handle media player commands."""
