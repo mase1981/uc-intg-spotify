@@ -123,6 +123,20 @@ services:
 docker run -d --name uc-spotify --restart unless-stopped --network host -v spotify-config:/app/config -e UC_CONFIG_HOME=/app/config -e UC_INTEGRATION_INTERFACE=0.0.0.0 -e UC_INTEGRATION_HTTP_PORT=9090 -e PYTHONPATH=/app ghcr.io/mase1981/uc-intg-spotify:latest
 ```
 
+### Local Release Build
+
+To build the same uploadable archive locally, run:
+
+```bash
+./scripts/build-local.sh
+```
+
+The script uses Docker and the same `unfoldedcircle/r2-pyinstaller` builder image as the GitHub Actions workflow. It creates `uc-intg-spotify-<version>-aarch64.tar.gz` in the project root. The version defaults to `driver.json`, or you can override it like so:
+
+```bash
+./scripts/build-local.sh 1.0.7
+```
+
 ## Configuration
 
 ### Step 1: Enter App Credentials
