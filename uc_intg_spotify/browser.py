@@ -304,7 +304,7 @@ async def _browse_album_tracks(
 
     album_name = data.get("name", "Album")
     album_images = data.get("images", [])
-    album_thumbnail = album_images[0]["url"] if album_images else ""
+    album_thumbnail = album_images[0]["url"] if album_images else None
     album_artists = ", ".join(a.get("name", "") for a in data.get("artists", []))
 
     tracks_data = data.get("tracks", {})
@@ -358,7 +358,7 @@ async def _browse_artist(
 
     artist_name = artist_data.get("name", "Artist")
     artist_images = artist_data.get("images", [])
-    artist_thumbnail = artist_images[0]["url"] if artist_images else ""
+    artist_thumbnail = artist_images[0]["url"] if artist_images else None
 
     items = []
 
@@ -400,7 +400,7 @@ def _track_to_browse_item(track: dict) -> BrowseMediaItem | None:
     album = track.get("album", {})
     album_name = album.get("name", "")
     images = album.get("images", [])
-    thumbnail = images[0]["url"] if images else ""
+    thumbnail = images[0]["url"] if images else None
     duration_ms = track.get("duration_ms", 0)
 
     return BrowseMediaItem(
@@ -425,7 +425,7 @@ def _album_to_browse_item(album: dict) -> BrowseMediaItem | None:
 
     artists = ", ".join(a.get("name", "") for a in album.get("artists", []))
     images = album.get("images", [])
-    thumbnail = images[0]["url"] if images else ""
+    thumbnail = images[0]["url"] if images else None
 
     return BrowseMediaItem(
         title=album_name,
@@ -446,7 +446,7 @@ def _artist_to_browse_item(artist: dict) -> BrowseMediaItem | None:
         return None
 
     images = artist.get("images", [])
-    thumbnail = images[0]["url"] if images else ""
+    thumbnail = images[0]["url"] if images else None
 
     return BrowseMediaItem(
         title=artist_name,
@@ -468,7 +468,7 @@ def _playlist_to_browse_item(playlist: dict) -> BrowseMediaItem | None:
         return None
 
     images = playlist.get("images", [])
-    thumbnail = images[0]["url"] if images else ""
+    thumbnail = images[0]["url"] if images else None
     owner = playlist.get("owner", {}).get("display_name", "")
 
     return BrowseMediaItem(

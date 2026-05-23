@@ -317,7 +317,7 @@ class SpotifyClient:
         self, limit: int = 50, offset: int = 0
     ) -> dict[str, Any] | None:
         return await self._api_request(
-            "GET", f"/browse/new-releases?limit={limit}&offset={offset}"
+            "GET", f"/search?q=tag%3Anew&type=album&limit={limit}&offset={offset}"
         )
 
     async def search(
