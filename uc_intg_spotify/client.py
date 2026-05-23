@@ -176,7 +176,8 @@ class SpotifyClient:
                     except (aiohttp.ContentTypeError, ValueError):
                         return {}
 
-                _LOG.error("API %s %s failed: %s", method, endpoint, response.status)
+                body = await response.text()
+                _LOG.error("API %s %s failed: %s - %s", method, endpoint, response.status, body[:500])
                 return None
         except Exception as e:
             _LOG.error("API request error: %s", e)
@@ -259,12 +260,38 @@ class SpotifyClient:
 
     async def play_uri(self, uri: str) -> bool:
         if uri.startswith("spotify:track:"):
-            return await self._api_request(
-                "PUT", "/me/player/play", json={"uris": [uri]}
-            ) is not None
-        return await self._api_request(
-            "PUT", "/me/player/play", json={"context_uri": uri}
-        ) is not None
+            body: dict[str, Any] = {"uris": [uri]}
+        else:
+            body = {"context_uri": uri}
+
+        result = await self._api_request("PUT", "/me/player/play", json=body)
+        if result is not None:
+            return True
+
+        device_id = await self._get_first_available_device()
+        if device_id:
+            _LOG.info("No active device, transferring to %s", device_id)
+            await self._api_request(
+                "PUT", "/me/player", json={"device_ids": [device_id], "play": False}
+            )
+            result = await self._api_request("PUT", "/me/player/play", json=body)
+            return result is not None
+
+        _LOG.warning("No available Spotify devices to play on")
+        return False
+
+    async def get_available_devices(self) -> list[dict[str, Any]]:
+        data = await self._api_request("GET", "/me/player/devices")
+        if data and "devices" in data:
+            return data["devices"]
+        return []
+
+    async def _get_first_available_device(self) -> str | None:
+        devices = await self.get_available_devices()
+        for dev in devices:
+            if dev.get("id"):
+                return dev["id"]
+        return None
 
     # ── Browse / Library ──
 

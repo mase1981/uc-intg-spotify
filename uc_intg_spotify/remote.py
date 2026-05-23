@@ -48,6 +48,7 @@ class SpotifyRemote(RemoteEntity):
             ui_pages=_create_ui_pages(),
             cmd_handler=self._handle_command,
         )
+        self.subscribe_to_device(device)
 
     async def sync_state(self) -> None:
         has_client = self._device.client is not None and self._device.client.is_authenticated()

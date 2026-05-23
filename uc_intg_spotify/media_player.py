@@ -67,6 +67,7 @@ class SpotifyMediaPlayer(MediaPlayerEntity):
             device_class=media_player.DeviceClasses.SPEAKER,
             cmd_handler=self._handle_command,
         )
+        self.subscribe_to_device(device)
 
     async def sync_state(self) -> None:
         dev = self._device
