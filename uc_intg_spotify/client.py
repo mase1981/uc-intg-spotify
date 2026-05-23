@@ -270,11 +270,10 @@ class SpotifyClient:
 
         device_id = await self._get_first_available_device()
         if device_id:
-            _LOG.info("No active device, transferring to %s", device_id)
-            await self._api_request(
-                "PUT", "/me/player", json={"device_ids": [device_id], "play": False}
+            _LOG.info("No active device, playing on %s", device_id)
+            result = await self._api_request(
+                "PUT", f"/me/player/play?device_id={device_id}", json=body
             )
-            result = await self._api_request("PUT", "/me/player/play", json=body)
             return result is not None
 
         _LOG.warning("No available Spotify devices to play on")
