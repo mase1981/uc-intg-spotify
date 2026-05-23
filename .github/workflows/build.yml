@@ -44,7 +44,6 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y qemu-system-arm binfmt-support qemu-user-static
           docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
-          echo "Starting pyinstaller build"
           docker run --rm --name builder \
             --platform=aarch64 \
             --user=$(id -u):$(id -g) \
@@ -53,14 +52,26 @@ jobs:
             bash -c \
             "cd /workspace && \
               python -m pip install -r requirements.txt && \
-              pyinstaller --clean --onedir --name intg-${{ env.DRIVER_ID }} --add-data driver.json:. uc_intg_spotify/__main__.py"
+              pyinstaller --clean --onedir --name driver \
+                --add-data driver.json:. \
+                --collect-all zeroconf \
+                --collect-all ucapi \
+                --collect-all ucapi_framework \
+                --hidden-import uc_intg_${INTG_NAME}.driver \
+                --hidden-import uc_intg_${INTG_NAME}.device \
+                --hidden-import uc_intg_${INTG_NAME}.config \
+                --hidden-import uc_intg_${INTG_NAME}.client \
+                --hidden-import uc_intg_${INTG_NAME}.media_player \
+                --hidden-import uc_intg_${INTG_NAME}.remote \
+                --hidden-import uc_intg_${INTG_NAME}.browser \
+                --hidden-import uc_intg_${INTG_NAME}.setup \
+                --paths . \
+                uc_intg_${INTG_NAME}/__init__.py"
 
       - name: Prepare artifacts
-        shell: bash
         run: |
           mkdir -p artifacts/bin
-          mv dist/intg-${{ env.DRIVER_ID }}/* artifacts/bin
-          mv artifacts/bin/intg-${{ env.DRIVER_ID }} artifacts/bin/driver
+          mv dist/driver/* artifacts/bin/
           cp driver.json artifacts/
           echo "ARTIFACT_NAME=uc-intg-${{ env.DRIVER_ID }}-${{ env.VERSION }}-aarch64" >> $GITHUB_ENV
           
