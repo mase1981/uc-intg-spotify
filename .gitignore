@@ -1,5 +1,3 @@
-# Create .gitignore file
-cat > .gitignore << 'EOF'
 # Python
 __pycache__/
 *.py[cod]
@@ -36,6 +34,7 @@ ENV/
 *~
 
 # Configuration (contains secrets)
+config/
 config.json
 .env
 
@@ -52,7 +51,11 @@ Thumbs.db
 *.temp
 artifacts/
 uc-intg-*-aarch64.tar.gz
+tmpclaude-*
 
-# Docker
-.dockerignore
-EOF
+# Claude knowledge base (local only, never commit)
+.claude/
+
+# Testing files (keep local only, never push to repository)
+tests/
+simulator/

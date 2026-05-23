@@ -1,158 +1,145 @@
-"""
-Setup handler for Spotify integration.
+"""Spotify setup flow. :copyright: (c) 2024 by Meir Miyara. :license: MPL-2.0"""
+from __future__ import annotations
 
-:copyright: (c) 2024
-:license: MPL-2.0, see LICENSE for more details.
-"""
 import logging
-from typing import Any, Callable, Coroutine
+from typing import Any
 
-import ucapi
+from ucapi import RequestUserInput
+from ucapi_framework import BaseSetupFlow
 
 from uc_intg_spotify.client import SpotifyClient
-from uc_intg_spotify.config import SpotifyConfig
+from uc_intg_spotify.config import SpotifyDeviceConfig
 
 _LOG = logging.getLogger(__name__)
 
 
-class SpotifySetup:
-    """Setup handler for Spotify integration."""
-    
-    def __init__(self, config: SpotifyConfig, client: SpotifyClient, setup_complete_callback: Callable[[], Coroutine[Any, Any, None]]):
-        self._config = config
-        self._client = client
-        self._setup_complete_callback = setup_complete_callback
-    
-    async def setup_handler(self, msg: ucapi.SetupDriver) -> ucapi.SetupAction:
-        """Handle setup requests from Remote Two."""
-        _LOG.info("Setup handler called with: %s", type(msg).__name__)
-        
-        if isinstance(msg, ucapi.DriverSetupRequest):
-            return await self._handle_driver_setup_request(msg)
-        elif isinstance(msg, ucapi.UserDataResponse):
-            return await self._handle_user_data_response(msg)
-        elif isinstance(msg, ucapi.AbortDriverSetup):
-            return await self._handle_abort_setup(msg)
-        
-        return ucapi.SetupError(ucapi.IntegrationSetupError.OTHER)
-    
-    async def _handle_driver_setup_request(self, msg: ucapi.DriverSetupRequest) -> ucapi.SetupAction:
-        """Handle initial setup request."""
-        _LOG.debug("Handling driver setup request.")
-        
-        if self._config.is_configured() and not msg.reconfigure:
-            _LOG.info("Already configured, proceeding to completion")
-            await self._setup_complete_callback() 
-            return ucapi.SetupComplete()
-        
-        if msg.setup_data:
-            client_id = msg.setup_data.get("client_id", "").strip()
-            client_secret = msg.setup_data.get("client_secret", "").strip()
+class SpotifySetupFlow(BaseSetupFlow[SpotifyDeviceConfig]):
+    """Setup flow for Spotify integration using OAuth2."""
 
-            if client_id and client_secret:
-                _LOG.info("App credentials provided, proceeding to authentication")
-                self._config.set_app_credentials(client_id, client_secret)
-                return await self._show_authentication_screen()
-            else:
-                _LOG.error("Missing client ID or client secret in setup data")
-                return ucapi.SetupError(ucapi.IntegrationSetupError.OTHER)
-        
-        _LOG.warning("No setup data provided")
-        return ucapi.SetupError(ucapi.IntegrationSetupError.OTHER)
-    
-    async def _show_authentication_screen(self) -> ucapi.SetupAction:
-        """Show the Spotify authentication screen."""
-        _LOG.debug("Showing Spotify authentication screen.")
-        
-        try:
-            auth_url = self._client.get_authorization_url()
-        except ValueError as e:
-            _LOG.error("Failed to generate auth URL: %s", e)
-            return ucapi.SetupError(ucapi.IntegrationSetupError.OTHER)
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._client_id: str = ""
+        self._client_secret: str = ""
 
-        return ucapi.RequestUserInput(
-            title={"en": "Spotify Authentication"},
-            settings=[
+    def get_manual_entry_form(self) -> RequestUserInput:
+        return RequestUserInput(
+            {"en": "Spotify Setup"},
+            [
+                {
+                    "id": "info",
+                    "label": {"en": "Setup Instructions"},
+                    "field": {
+                        "label": {
+                            "value": {
+                                "en": "IMPORTANT: Spotify Premium is required.\n\n"
+                                "1. Go to https://developer.spotify.com/dashboard\n"
+                                "2. Log in and click 'Create App'\n"
+                                "3. App Name: 'UC Remote Integration'\n"
+                                "4. Redirect URI: https://example.com/callback\n"
+                                "5. Check 'Web API' and save\n"
+                                "6. Copy Client ID and Client Secret below"
+                            }
+                        }
+                    },
+                },
+                {
+                    "id": "client_id",
+                    "label": {"en": "Spotify Client ID"},
+                    "field": {"text": {"value": ""}},
+                },
+                {
+                    "id": "client_secret",
+                    "label": {"en": "Spotify Client Secret"},
+                    "field": {"text": {"value": ""}},
+                },
+            ],
+        )
+
+    async def query_device(
+        self, input_values: dict[str, Any]
+    ) -> SpotifyDeviceConfig | RequestUserInput:
+        if "auth_code" in input_values:
+            return await self._handle_auth_code(input_values)
+
+        client_id = input_values.get("client_id", "").strip()
+        client_secret = input_values.get("client_secret", "").strip()
+
+        if not client_id or not client_secret:
+            raise ValueError("Both Client ID and Client Secret are required")
+
+        self._client_id = client_id
+        self._client_secret = client_secret
+
+        client = SpotifyClient()
+        auth_url = client.get_authorization_url(client_id)
+
+        return RequestUserInput(
+            {"en": "Spotify Authentication"},
+            [
                 {
                     "id": "instructions",
                     "label": {"en": "Authentication Instructions"},
                     "field": {
                         "label": {
                             "value": {
-                                "en": "1. Click the Spotify URL below to open it in a new browser tab\n2. Log in to your Spotify account and authorize this application\n3. Your browser will show 'page not found' - this is normal!\n4. Look at your browser's address bar and find 'code=...'\n5. Copy the long code after 'code=' and paste it below"
+                                "en": "1. Click the URL below to open in a browser\n"
+                                "2. Log in and authorize the application\n"
+                                "3. You'll see 'page not found' - this is normal!\n"
+                                "4. Copy the 'code=...' value from your browser's address bar\n"
+                                "5. Paste the code or full URL below"
                             }
                         }
-                    }
+                    },
                 },
                 {
                     "id": "spotify_url",
-                    "label": {"en": "Spotify Authorization URL (Click to Copy)"},
-                    "field": {
-                        "text": {
-                            "value": auth_url,
-                            "read_only": True
-                        }
-                    }
+                    "label": {"en": "Spotify Authorization URL"},
+                    "field": {"text": {"value": auth_url, "read_only": True}},
                 },
                 {
                     "id": "auth_code",
-                    "label": {"en": "Paste Code or Full URL Here"},
-                    "field": {
-                        "text": {
-                            "value": "",
-                            "placeholder": "Paste the code or entire URL from your browser here..."
-                        }
-                    }
-                }
-            ]
+                    "label": {"en": "Paste Code or Full URL"},
+                    "field": {"text": {"value": "", "placeholder": "Paste here..."}},
+                },
+            ],
         )
-    
-    async def _handle_user_data_response(self, msg: ucapi.UserDataResponse) -> ucapi.SetupAction:
-        """Handle the submitted authorization code."""
-        _LOG.debug("Handling user data response: %s", msg.input_values)
-        
-        auth_input = msg.input_values.get("auth_code", "").strip()
-        
+
+    async def _handle_auth_code(
+        self, input_values: dict[str, Any]
+    ) -> SpotifyDeviceConfig:
+        auth_input = input_values.get("auth_code", "").strip()
         if not auth_input:
-            _LOG.error("Authorization code is missing from user input.")
-            return ucapi.SetupError(ucapi.IntegrationSetupError.OTHER)
-        
-        # Extract code from URL if user pasted full URL
+            raise ValueError("Authorization code is required")
+
         auth_code = auth_input
         if "code=" in auth_input:
             try:
-                if "example.com/callback" in auth_input or auth_input.startswith("http"):
-                    code_part = auth_input.split("code=")[1]
-                    auth_code = code_part.split("&")[0]
-                    _LOG.info("Extracted code from URL. Original length: %d, Code length: %d", len(auth_input), len(auth_code))
-                else:
-                    auth_code = auth_input
-                    _LOG.info("Using input as-is: %s", auth_code[:20] + "...")
-            except Exception as e:
-                _LOG.error("Failed to extract code from input: %s", e)
-                return ucapi.SetupError(ucapi.IntegrationSetupError.OTHER)
-        
-        if not auth_code:
-            _LOG.error("Could not extract authorization code from input.")
-            return ucapi.SetupError(ucapi.IntegrationSetupError.OTHER)
-        
-        _LOG.info("Exchanging authorization code for access tokens...")
-        try:
-            success = await self._client.exchange_code_for_token(auth_code)
-            
-            if success:
-                _LOG.info("Successfully authenticated with Spotify.")
-                await self._setup_complete_callback()
-                return ucapi.SetupComplete()
-            else:
-                _LOG.error("Failed to authenticate with Spotify.")
-                return ucapi.SetupError(ucapi.IntegrationSetupError.AUTHORIZATION_ERROR)
-                
-        except Exception as e:
-            _LOG.error("Error during token exchange: %s", e)
-            return ucapi.SetupError(ucapi.IntegrationSetupError.OTHER)
-    
-    async def _handle_abort_setup(self, msg: ucapi.AbortDriverSetup) -> ucapi.SetupAction:
-        _LOG.info("Setup aborted: %s", msg.error)
-        self._config.clear_tokens()
-        return ucapi.SetupError(msg.error)
+                code_part = auth_input.split("code=")[1]
+                auth_code = code_part.split("&")[0]
+            except (IndexError, ValueError):
+                raise ValueError("Could not extract code from URL")
+
+        client = SpotifyClient()
+        token_data = await client.exchange_code_for_token(
+            auth_code, self._client_id, self._client_secret
+        )
+        await client.close()
+
+        if not token_data:
+            raise ConnectionError("Failed to authenticate with Spotify")
+
+        access_token = token_data["access_token"]
+        refresh_token = token_data["refresh_token"]
+        expires_in = token_data.get("expires_in", 3600)
+
+        import time
+
+        return SpotifyDeviceConfig(
+            identifier="spotify",
+            name="Spotify",
+            client_id=self._client_id,
+            client_secret=self._client_secret,
+            access_token=access_token,
+            refresh_token=refresh_token,
+            token_expires_at=int(time.time()) + expires_in - 60,
+        )

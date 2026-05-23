@@ -1,319 +1,192 @@
-"""
-Spotify media player entity for Unfolded Circle integration.
+"""Spotify media player entity. :copyright: (c) 2024 by Meir Miyara. :license: MPL-2.0"""
+from __future__ import annotations
 
-:copyright: (c) 2024
-:license: MPL-2.0, see LICENSE for more details.
-"""
-import asyncio
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, TYPE_CHECKING
 
-import ucapi
-from ucapi.media_player import Attributes, Commands, Features, States
+from ucapi import media_player, StatusCodes
+from ucapi.media_player import BrowseOptions, BrowseResults, SearchOptions, SearchResults
+from ucapi_framework import MediaPlayerEntity
 
-from uc_intg_spotify.client import SpotifyClient
-from uc_intg_spotify.config import SpotifyConfig
+from uc_intg_spotify import browser
+
+if TYPE_CHECKING:
+    from uc_intg_spotify.config import SpotifyDeviceConfig
+    from uc_intg_spotify.device import SpotifyDevice
 
 _LOG = logging.getLogger(__name__)
-COMMAND_REFRESH_DELAY_SECONDS = 2.0
-TRACK_END_REFRESH_SETTLE_SECONDS = 1.0
+
+FEATURES = [
+    media_player.Features.ON_OFF,
+    media_player.Features.PLAY_PAUSE,
+    media_player.Features.NEXT,
+    media_player.Features.PREVIOUS,
+    media_player.Features.VOLUME,
+    media_player.Features.VOLUME_UP_DOWN,
+    media_player.Features.SEEK,
+    media_player.Features.SHUFFLE,
+    media_player.Features.REPEAT,
+    media_player.Features.MEDIA_DURATION,
+    media_player.Features.MEDIA_POSITION,
+    media_player.Features.MEDIA_TITLE,
+    media_player.Features.MEDIA_ARTIST,
+    media_player.Features.MEDIA_ALBUM,
+    media_player.Features.MEDIA_IMAGE_URL,
+    media_player.Features.MEDIA_TYPE,
+    media_player.Features.PLAY_MEDIA,
+    media_player.Features.BROWSE_MEDIA,
+    media_player.Features.SEARCH_MEDIA,
+]
 
 
-class SpotifyMediaPlayer:
-    """Spotify media player entity."""
-    
-    def __init__(self, api: ucapi.IntegrationAPI, client: SpotifyClient):
-        """Initialize Spotify media player."""
-        self._api = api
-        self._client = client
-        self._config: SpotifyConfig = client._config if client else None
-        self._polling_task: Optional[asyncio.Task] = None
-        self._command_refresh_task: Optional[asyncio.Task] = None
-        self._track_end_refresh_task: Optional[asyncio.Task] = None
-        if self._client:
-            self._client.set_playback_state_changed_callback(self.schedule_playback_state_refresh)
-        
-        features = [
-            Features.ON_OFF,
-            Features.MEDIA_DURATION,
-            Features.MEDIA_POSITION,
-            Features.MEDIA_TITLE,
-            Features.MEDIA_ARTIST,
-            Features.MEDIA_ALBUM,
-            Features.MEDIA_IMAGE_URL,
-            Features.MEDIA_TYPE,
-            Features.PLAY_PAUSE,
-            Features.NEXT,
-            Features.PREVIOUS,
-            Features.VOLUME,
-            Features.VOLUME_UP_DOWN,
-        ]
-        
-        attributes = {
-            Attributes.STATE: States.OFF,
-            Attributes.MEDIA_TITLE: "",
-            Attributes.MEDIA_ARTIST: "",
-            Attributes.MEDIA_ALBUM: "",
-            Attributes.MEDIA_DURATION: 0,
-            Attributes.MEDIA_POSITION: 0,
-            Attributes.MEDIA_IMAGE_URL: "",
-            Attributes.VOLUME: 50,
-            Attributes.MUTED: False,
-        }
-        
-        self.entity = ucapi.MediaPlayer(
-            identifier="spotify_media_player_main",
-            name={"en": "Spotify Player"},
-            features=features,
-            attributes=attributes,
-            cmd_handler=self.cmd_handler
-        )
-        
-        _LOG.info("Spotify media player entity created with %d features", len(features))
+class SpotifyMediaPlayer(MediaPlayerEntity):
+    """Media player entity for Spotify."""
 
-    async def start_polling(self):
-        """Start the background polling task."""
-        if not self._polling_task or self._polling_task.done():
-            polling_interval = self._config.get_polling_interval()
-            self._polling_task = asyncio.create_task(self._poll_playback_state(polling_interval))
-            _LOG.info(f"Started polling Spotify every {polling_interval} seconds.")
+    def __init__(self, device_config: SpotifyDeviceConfig, device: SpotifyDevice) -> None:
+        self._device = device
 
-    async def stop_polling(self):
-        """Stop the background polling task."""
-        if self._polling_task and not self._polling_task.done():
-            self._polling_task.cancel()
-            try:
-                await self._polling_task
-            except asyncio.CancelledError:
-                pass
-            _LOG.info("Stopped polling Spotify.")
-        self._polling_task = None
-        if self._command_refresh_task and not self._command_refresh_task.done():
-            self._command_refresh_task.cancel()
-            try:
-                await self._command_refresh_task
-            except asyncio.CancelledError:
-                pass
-        self._command_refresh_task = None
-        if self._track_end_refresh_task and not self._track_end_refresh_task.done():
-            self._track_end_refresh_task.cancel()
-            try:
-                await self._track_end_refresh_task
-            except asyncio.CancelledError:
-                pass
-        self._track_end_refresh_task = None
-        
-    async def _poll_playback_state(self, interval_seconds: int):
-        """Periodically poll for playback state."""
-        while True:
-            try:
-                if self._client.is_authenticated():
-                    await self.refresh_playback_state()
-                else:
-                    _LOG.debug("Polling skipped: client not authenticated.")
-            except Exception as e:
-                _LOG.error(f"Error during polling: {e}", exc_info=True)
-            
-            await asyncio.sleep(interval_seconds)
-
-    async def refresh_playback_state(self) -> None:
-        """Refresh playback state immediately."""
-        track_data = await self._client.get_currently_playing()
-        if track_data:
-            await self.update_current_track(track_data)
-        else:
-            await self.clear_current_track()
-
-    async def schedule_playback_state_refresh(self) -> None:
-        """Refresh playback state after Spotify has had time to settle."""
-        if self._command_refresh_task and not self._command_refresh_task.done():
-            self._command_refresh_task.cancel()
-
-        self._command_refresh_task = asyncio.create_task(self._delayed_playback_state_refresh())
-
-    async def _delayed_playback_state_refresh(self) -> None:
-        """Run a delayed refresh for commands whose visible state changes asynchronously."""
-        try:
-            await asyncio.sleep(COMMAND_REFRESH_DELAY_SECONDS)
-            await self.refresh_playback_state()
-        except asyncio.CancelledError:
-            raise
-        except Exception as e:
-            _LOG.error("Error during delayed playback refresh: %s", e, exc_info=True)
-
-    def schedule_track_end_refresh(self, track_data: Dict[str, Any]) -> None:
-        """Schedule a refresh shortly after the current track should end."""
-        if self._track_end_refresh_task and not self._track_end_refresh_task.done():
-            self._track_end_refresh_task.cancel()
-            self._track_end_refresh_task = None
-
-        if not track_data.get("is_playing", False):
-            return
-
-        duration_ms = track_data.get("duration_ms", 0)
-        progress_ms = track_data.get("progress_ms", 0)
-        if duration_ms <= 0:
-            return
-
-        remaining_seconds = max((duration_ms - progress_ms) / 1000, 0)
-        if remaining_seconds <= 0:
-            remaining_seconds = TRACK_END_REFRESH_SETTLE_SECONDS
-
-        delay_seconds = remaining_seconds + TRACK_END_REFRESH_SETTLE_SECONDS
-        self._track_end_refresh_task = asyncio.create_task(
-            self._refresh_when_track_ends(delay_seconds)
+        entity_id = f"media_player.{device_config.identifier}.player"
+        super().__init__(
+            entity_id,
+            "Spotify Player",
+            features=FEATURES,
+            attributes={
+                media_player.Attributes.STATE: media_player.States.UNAVAILABLE,
+                media_player.Attributes.VOLUME: 50,
+                media_player.Attributes.MUTED: False,
+                media_player.Attributes.MEDIA_TITLE: "",
+                media_player.Attributes.MEDIA_ARTIST: "",
+                media_player.Attributes.MEDIA_ALBUM: "",
+                media_player.Attributes.MEDIA_IMAGE_URL: "",
+                media_player.Attributes.MEDIA_TYPE: "",
+                media_player.Attributes.MEDIA_DURATION: 0,
+                media_player.Attributes.MEDIA_POSITION: 0,
+                media_player.Attributes.SHUFFLE: False,
+                media_player.Attributes.REPEAT: media_player.RepeatMode.OFF,
+            },
+            device_class=media_player.DeviceClasses.SPEAKER,
+            cmd_handler=self._handle_command,
         )
 
-    async def _refresh_when_track_ends(self, delay_seconds: float) -> None:
-        """Refresh playback after the current track should have advanced."""
+    async def sync_state(self) -> None:
+        dev = self._device
+        state = self.map_entity_states(dev._state)
+
+        repeat_map = {"track": media_player.RepeatMode.ONE, "context": media_player.RepeatMode.ALL}
+        repeat = repeat_map.get(dev._repeat, media_player.RepeatMode.OFF)
+
+        self.update({
+            media_player.Attributes.STATE: state,
+            media_player.Attributes.VOLUME: dev._volume,
+            media_player.Attributes.MUTED: dev._muted,
+            media_player.Attributes.MEDIA_TITLE: dev._title,
+            media_player.Attributes.MEDIA_ARTIST: dev._artist,
+            media_player.Attributes.MEDIA_ALBUM: dev._album,
+            media_player.Attributes.MEDIA_IMAGE_URL: dev._image_url,
+            media_player.Attributes.MEDIA_TYPE: media_player.MediaContentType.MUSIC,
+            media_player.Attributes.MEDIA_DURATION: dev._duration,
+            media_player.Attributes.MEDIA_POSITION: dev._position,
+            media_player.Attributes.SHUFFLE: dev._shuffle,
+            media_player.Attributes.REPEAT: repeat,
+        })
+
+    async def browse(self, options: BrowseOptions) -> BrowseResults | StatusCodes:
+        return await browser.browse(self._device.client, options)
+
+    async def search(self, options: SearchOptions) -> SearchResults | StatusCodes:
+        return await browser.search(self._device.client, options)
+
+    async def _handle_command(
+        self, entity: media_player.MediaPlayer, cmd_id: str, params: dict[str, Any] | None
+    ) -> StatusCodes:
+        client = self._device.client
+        if not client or not client.is_authenticated():
+            return StatusCodes.SERVICE_UNAVAILABLE
+
         try:
-            await asyncio.sleep(delay_seconds)
-            if self._track_end_refresh_task is asyncio.current_task():
-                self._track_end_refresh_task = None
-            await self.refresh_playback_state()
-        except asyncio.CancelledError:
-            raise
-        except Exception as e:
-            _LOG.error("Error refreshing playback at track end: %s", e, exc_info=True)
+            return await self._dispatch(client, cmd_id, params)
+        except Exception as err:
+            _LOG.error("Command %s failed: %s", cmd_id, err)
+            return StatusCodes.SERVER_ERROR
 
-    async def cmd_handler(self, entity: ucapi.Entity, cmd_id: str, params: dict[str, Any] | None) -> ucapi.StatusCodes:
-        """Handle media player commands."""
-        _LOG.info("Media player command: %s %s", cmd_id, params)
-        
-        if not self._client or not self._client.is_authenticated():
-            _LOG.warning("Spotify client not authenticated")
-            return ucapi.StatusCodes.SERVICE_UNAVAILABLE
-        
-        try:
-            if cmd_id == Commands.ON:
-                return await self._handle_on()
-            elif cmd_id == Commands.OFF:
-                return await self._handle_off()
-            elif cmd_id == Commands.PLAY_PAUSE:
-                return await self._handle_play_pause()
-            elif cmd_id == Commands.NEXT:
-                return await self._handle_next()
-            elif cmd_id == Commands.PREVIOUS:
-                return await self._handle_previous()
-            elif cmd_id == Commands.VOLUME:
-                return await self._handle_volume(params)
-            elif cmd_id == Commands.VOLUME_UP:
-                return await self._handle_volume_up()
-            elif cmd_id == Commands.VOLUME_DOWN:
-                return await self._handle_volume_down()
-            else:
-                _LOG.info("Unhandled command %s - ignoring", cmd_id)
-                return ucapi.StatusCodes.OK
-                
-        except Exception as e:
-            _LOG.error("Error handling command %s: %s", cmd_id, e)
-            return ucapi.StatusCodes.SERVER_ERROR
-    
-    async def _handle_play_pause(self) -> ucapi.StatusCodes:
-        """Handle play/pause command."""
-        success = await self._client.play_pause()
-        return ucapi.StatusCodes.OK if success else ucapi.StatusCodes.SERVER_ERROR
-    
-    async def _handle_next(self) -> ucapi.StatusCodes:
-        """Handle next track command."""
-        success = await self._client.next_track()
-        return ucapi.StatusCodes.OK if success else ucapi.StatusCodes.SERVER_ERROR
-    
-    async def _handle_previous(self) -> ucapi.StatusCodes:
-        """Handle previous track command."""
-        success = await self._client.previous_track()
-        return ucapi.StatusCodes.OK if success else ucapi.StatusCodes.SERVER_ERROR
-    
-    async def _handle_volume(self, params: dict[str, Any] | None) -> ucapi.StatusCodes:
-        """Handle volume set command."""
-        if not params or "volume" not in params:
-            return ucapi.StatusCodes.BAD_REQUEST
-        
-        volume = params["volume"]
-        success = await self._client.set_volume(volume)
-        
-        if success:
-            self._api.configured_entities.update_attributes(self.entity.id, {Attributes.VOLUME: volume})
-        
-        return ucapi.StatusCodes.OK if success else ucapi.StatusCodes.SERVER_ERROR
-    
-    async def _handle_volume_up(self) -> ucapi.StatusCodes:
-        """Handle volume up command."""
-        current_volume = self.entity.attributes.get(Attributes.VOLUME, 50)
-        new_volume = min(100, current_volume + 5)
-        return await self._handle_volume({"volume": new_volume})
-    
-    async def _handle_volume_down(self) -> ucapi.StatusCodes:
-        """Handle volume down command."""
-        current_volume = self.entity.attributes.get(Attributes.VOLUME, 50)
-        new_volume = max(0, current_volume - 5)
-        return await self._handle_volume({"volume": new_volume})
-    
-    async def _handle_on(self) -> ucapi.StatusCodes:
-        """Handle turn on command."""
-        success = await self._client.play()
-        if success:
-            self._api.configured_entities.update_attributes(self.entity.id, {Attributes.STATE: States.PLAYING})
-        return ucapi.StatusCodes.OK if success else ucapi.StatusCodes.SERVER_ERROR
-    
-    async def _handle_off(self) -> ucapi.StatusCodes:
-        """Handle turn off command."""
-        success = await self._client.pause()
-        if success:
-            self._api.configured_entities.update_attributes(self.entity.id, {Attributes.STATE: States.PAUSED})
-        return ucapi.StatusCodes.OK if success else ucapi.StatusCodes.SERVER_ERROR
-    
-    async def update_current_track(self, track_data: Dict[str, Any]) -> None:
-        """Update media player with current track information."""
-        try:
-            attributes = {}
-            
-            if track_data.get("is_playing", False):
-                attributes[Attributes.STATE] = States.PLAYING
-            else:
-                attributes[Attributes.STATE] = States.PAUSED
-            
-            attributes[Attributes.MEDIA_TITLE] = track_data.get("title", "")
-            attributes[Attributes.MEDIA_ARTIST] = ", ".join(track_data.get("artists", []))
-            attributes[Attributes.MEDIA_ALBUM] = track_data.get("album", "")
-            attributes[Attributes.MEDIA_DURATION] = track_data.get("duration_ms", 0) // 1000
-            attributes[Attributes.MEDIA_POSITION] = track_data.get("progress_ms", 0) // 1000
-            attributes[Attributes.MEDIA_IMAGE_URL] = track_data.get("image_url", "")
-            attributes[Attributes.VOLUME] = track_data.get("volume_percent", 50)
-            attributes[Attributes.MUTED] = track_data.get("volume_percent", 50) == 0
+    async def _dispatch(self, client, cmd_id: str, params: dict[str, Any] | None) -> StatusCodes:
+        if cmd_id == media_player.Commands.ON:
+            ok = await client.play()
+            return StatusCodes.OK if ok else StatusCodes.SERVER_ERROR
 
-            # Only send update if attributes have changed
-            changed_attrs = {k: v for k, v in attributes.items() if self.entity.attributes.get(k) != v}
+        if cmd_id == media_player.Commands.OFF:
+            ok = await client.pause()
+            return StatusCodes.OK if ok else StatusCodes.SERVER_ERROR
 
-            if changed_attrs:
-                self._api.configured_entities.update_attributes(self.entity.id, changed_attrs)
-                _LOG.debug(f"Updated track info: {changed_attrs}")
+        if cmd_id == media_player.Commands.PLAY_PAUSE:
+            ok = await client.play_pause()
+            return StatusCodes.OK if ok else StatusCodes.SERVER_ERROR
 
-            self.schedule_track_end_refresh(track_data)
-            
-        except Exception as e:
-            _LOG.error("Error updating current track: %s", e)
-    
-    async def clear_current_track(self) -> None:
-        """Clear current track information when nothing is playing."""
-        try:
-            attributes = {
-                Attributes.STATE: States.OFF,
-                Attributes.MEDIA_TITLE: "",
-                Attributes.MEDIA_ARTIST: "",
-                Attributes.MEDIA_ALBUM: "",
-                Attributes.MEDIA_DURATION: 0,
-                Attributes.MEDIA_POSITION: 0,
-                Attributes.MEDIA_IMAGE_URL: ""
-            }
-            
-            if self.entity.attributes.get(Attributes.STATE) != States.OFF:
-                self._api.configured_entities.update_attributes(self.entity.id, attributes)
-                _LOG.debug("Cleared current track information")
+        if cmd_id == media_player.Commands.NEXT:
+            ok = await client.next_track()
+            return StatusCodes.OK if ok else StatusCodes.SERVER_ERROR
 
-            if self._track_end_refresh_task and not self._track_end_refresh_task.done():
-                self._track_end_refresh_task.cancel()
-            self._track_end_refresh_task = None
-            
-        except Exception as e:
-            _LOG.error("Error clearing current track: %s", e)
+        if cmd_id == media_player.Commands.PREVIOUS:
+            ok = await client.previous_track()
+            return StatusCodes.OK if ok else StatusCodes.SERVER_ERROR
+
+        if cmd_id == media_player.Commands.VOLUME and params:
+            ok = await client.set_volume(params.get("volume", 50))
+            return StatusCodes.OK if ok else StatusCodes.SERVER_ERROR
+
+        if cmd_id == media_player.Commands.VOLUME_UP:
+            new_vol = min(100, self._device._volume + 5)
+            ok = await client.set_volume(new_vol)
+            return StatusCodes.OK if ok else StatusCodes.SERVER_ERROR
+
+        if cmd_id == media_player.Commands.VOLUME_DOWN:
+            new_vol = max(0, self._device._volume - 5)
+            ok = await client.set_volume(new_vol)
+            return StatusCodes.OK if ok else StatusCodes.SERVER_ERROR
+
+        if cmd_id == media_player.Commands.SEEK and params:
+            position_s = params.get("media_position", 0)
+            ok = await client.seek(int(position_s) * 1000)
+            return StatusCodes.OK if ok else StatusCodes.SERVER_ERROR
+
+        if cmd_id == media_player.Commands.SHUFFLE:
+            new_state = not self._device._shuffle
+            ok = await client.set_shuffle(new_state)
+            return StatusCodes.OK if ok else StatusCodes.SERVER_ERROR
+
+        if cmd_id == media_player.Commands.REPEAT:
+            cycle = {"off": "context", "context": "track", "track": "off"}
+            new_state = cycle.get(self._device._repeat, "off")
+            ok = await client.set_repeat(new_state)
+            return StatusCodes.OK if ok else StatusCodes.SERVER_ERROR
+
+        if cmd_id == media_player.Commands.PLAY_MEDIA:
+            return await self._handle_play_media(client, params)
+
+        _LOG.warning("Unhandled command: %s", cmd_id)
+        return StatusCodes.NOT_IMPLEMENTED
+
+    async def _handle_play_media(self, client, params: dict[str, Any] | None) -> StatusCodes:
+        if not params:
+            return StatusCodes.BAD_REQUEST
+
+        media_id = params.get("media_id", "")
+        if not media_id:
+            return StatusCodes.BAD_REQUEST
+
+        uri = ""
+        if media_id.startswith("track_"):
+            uri = f"spotify:track:{media_id[6:]}"
+        elif media_id.startswith("album_"):
+            uri = f"spotify:album:{media_id[6:]}"
+        elif media_id.startswith("playlist_"):
+            uri = f"spotify:playlist:{media_id[9:]}"
+        elif media_id.startswith("artist_"):
+            uri = f"spotify:artist:{media_id[7:]}"
+
+        if not uri:
+            _LOG.warning("Unknown media_id format: %s", media_id)
+            return StatusCodes.BAD_REQUEST
+
+        ok = await client.play_uri(uri)
+        return StatusCodes.OK if ok else StatusCodes.SERVER_ERROR

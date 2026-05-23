@@ -53,7 +53,7 @@ jobs:
             bash -c \
             "cd /workspace && \
               python -m pip install -r requirements.txt && \
-              pyinstaller --clean --onedir --name intg-${{ env.DRIVER_ID }} --collect-all zeroconf uc_intg_spotify/driver.py"
+              pyinstaller --clean --onedir --name intg-${{ env.DRIVER_ID }} uc_intg_spotify/__main__.py"
 
       - name: Prepare artifacts
         shell: bash

@@ -1,151 +1,118 @@
-"""
-Spotify remote entity for Unfolded Circle integration.
-
-:copyright: (c) 2024
-:license: MPL-2.0, see LICENSE for more details.
-"""
+"""Spotify remote entity. :copyright: (c) 2024 by Meir Miyara. :license: MPL-2.0"""
+from __future__ import annotations
 
 import logging
-from typing import Any, Dict
+from typing import Any, TYPE_CHECKING
 
-import ucapi
-from ucapi.remote import Commands, Features, States
-from ucapi.ui import Buttons, Size, create_btn_mapping, create_ui_icon, UiPage
+from ucapi import remote, StatusCodes
+from ucapi.ui import Buttons, Size, UiPage, create_btn_mapping, create_ui_icon
+from ucapi_framework import RemoteEntity
 
-from uc_intg_spotify.client import SpotifyClient
-from uc_intg_spotify.config import SpotifyConfig
+if TYPE_CHECKING:
+    from uc_intg_spotify.config import SpotifyDeviceConfig
+    from uc_intg_spotify.device import SpotifyDevice
 
 _LOG = logging.getLogger(__name__)
 
+SIMPLE_COMMANDS = [
+    "PLAY_PAUSE",
+    "NEXT",
+    "PREVIOUS",
+    "VOLUME_UP",
+    "VOLUME_DOWN",
+    "SHUFFLE",
+    "REPEAT",
+]
 
-class SpotifyRemote:
-    """Spotify remote entity."""
-    
-    def __init__(self, api: ucapi.IntegrationAPI, client: SpotifyClient):
-        """Initialize Spotify remote."""
-        self._api = api
-        self._client = client
-        self._config: SpotifyConfig = client._config if client else None
-        
-        features = [Features.ON_OFF, Features.SEND_CMD]
 
-        simple_commands = [
-            "PLAY_PAUSE",
-            "NEXT",
-            "PREVIOUS",
-            "VOLUME_UP",
-            "VOLUME_DOWN"
-        ]
+class SpotifyRemote(RemoteEntity):
+    """Remote entity for Spotify."""
 
-        button_mapping = [
-            create_btn_mapping(Buttons.PLAY, "PLAY_PAUSE"),
-            create_btn_mapping(Buttons.NEXT, "NEXT"),
-            create_btn_mapping(Buttons.PREV, "PREVIOUS"),
-            create_btn_mapping(Buttons.VOLUME_UP, "VOLUME_UP"),
-            create_btn_mapping(Buttons.VOLUME_DOWN, "VOLUME_DOWN"),
-        ]
-        
-        ui_pages = self._create_ui_pages()
-        
-        self.entity = ucapi.Remote(
-            identifier="spotify_remote_main",
-            name={"en": "Spotify Remote"},
-            features=features,
-            attributes={"state": States.ON},
-            simple_commands=simple_commands,
-            button_mapping=button_mapping,
-            ui_pages=ui_pages,
-            cmd_handler=self.cmd_handler
+    def __init__(self, device_config: SpotifyDeviceConfig, device: SpotifyDevice) -> None:
+        self._device = device
+
+        entity_id = f"remote.{device_config.identifier}.remote"
+        super().__init__(
+            entity_id,
+            "Spotify Remote",
+            features=[remote.Features.ON_OFF, remote.Features.SEND_CMD],
+            attributes={"state": remote.States.ON},
+            simple_commands=SIMPLE_COMMANDS,
+            button_mapping=[
+                create_btn_mapping(Buttons.PLAY, "PLAY_PAUSE"),
+                create_btn_mapping(Buttons.NEXT, "NEXT"),
+                create_btn_mapping(Buttons.PREV, "PREVIOUS"),
+                create_btn_mapping(Buttons.VOLUME_UP, "VOLUME_UP"),
+                create_btn_mapping(Buttons.VOLUME_DOWN, "VOLUME_DOWN"),
+            ],
+            ui_pages=_create_ui_pages(),
+            cmd_handler=self._handle_command,
         )
-        
-        _LOG.info("Spotify remote entity created")
-    
-    def _create_ui_pages(self) -> list[UiPage]:
-        """Create UI pages for the remote."""
-        pages = []
 
-        main_page = UiPage(page_id="main", name="Spotify Controls", grid=Size(4, 6))
-        main_page.add(create_ui_icon("uc:play-pause", 1, 1, Size(2, 1), "PLAY_PAUSE"))
-        main_page.add(create_ui_icon("uc:backward", 0, 2, Size(1, 1), "PREVIOUS"))
-        main_page.add(create_ui_icon("uc:forward", 3, 2, Size(1, 1), "NEXT"))
-        main_page.add(create_ui_icon("uc:volume-high", 1, 3, Size(1, 1), "VOLUME_UP"))
-        main_page.add(create_ui_icon("uc:volume-low", 2, 3, Size(1, 1), "VOLUME_DOWN"))
+    async def sync_state(self) -> None:
+        has_client = self._device.client is not None and self._device.client.is_authenticated()
+        state = remote.States.ON if has_client else remote.States.OFF
+        self.update({"state": state})
 
-        pages.append(main_page)
-        return pages
-    
-    async def cmd_handler(self, entity: ucapi.Entity, cmd_id: str, params: dict[str, Any] | None) -> ucapi.StatusCodes:
-        """Handle remote commands."""
-        _LOG.info("Remote command: %s %s", cmd_id, params)
-        
-        if not self._client or not self._client.is_authenticated():
-            _LOG.warning("Spotify client not authenticated")
-            return ucapi.StatusCodes.SERVICE_UNAVAILABLE
-        
+    async def _handle_command(
+        self, entity: remote.Remote, cmd_id: str, params: dict[str, Any] | None
+    ) -> StatusCodes:
+        client = self._device.client
+        if not client or not client.is_authenticated():
+            return StatusCodes.SERVICE_UNAVAILABLE
+
         try:
-            if cmd_id == Commands.ON:
-                return await self._handle_on()
-            elif cmd_id == Commands.OFF:
-                return await self._handle_off()
-            elif cmd_id == Commands.SEND_CMD:
-                return await self._handle_send_cmd(params)
-            else:
-                _LOG.info("Unsupported remote command: %s", cmd_id)
-                return ucapi.StatusCodes.NOT_IMPLEMENTED
-                
-        except Exception as e:
-            _LOG.error("Error handling remote command %s: %s", cmd_id, e)
-            return ucapi.StatusCodes.SERVER_ERROR
-    
-    async def _handle_on(self) -> ucapi.StatusCodes:
-        """Handle remote on command."""
-        self._api.configured_entities.update_attributes(self.entity.id, {"state": States.ON})
-        return ucapi.StatusCodes.OK
-    
-    async def _handle_off(self) -> ucapi.StatusCodes:
-        """Handle remote off command.""" 
-        self._api.configured_entities.update_attributes(self.entity.id, {"state": States.OFF})
-        return ucapi.StatusCodes.OK
-    
-    async def _handle_send_cmd(self, params: dict[str, Any] | None) -> ucapi.StatusCodes:
-        """Handle send command."""
+            if cmd_id == remote.Commands.ON:
+                self.update({"state": remote.States.ON})
+                return StatusCodes.OK
+            if cmd_id == remote.Commands.OFF:
+                self.update({"state": remote.States.OFF})
+                return StatusCodes.OK
+            if cmd_id == remote.Commands.SEND_CMD:
+                return await self._handle_send_cmd(client, params)
+            return StatusCodes.NOT_IMPLEMENTED
+        except Exception as err:
+            _LOG.error("Remote command %s failed: %s", cmd_id, err)
+            return StatusCodes.SERVER_ERROR
+
+    async def _handle_send_cmd(self, client, params: dict[str, Any] | None) -> StatusCodes:
         if not params or "command" not in params:
-            return ucapi.StatusCodes.BAD_REQUEST
+            return StatusCodes.BAD_REQUEST
 
         command = params["command"]
-        _LOG.debug("Executing remote command: %s", command)
-        
-        success = False
+        ok = False
+
         if command == "PLAY_PAUSE":
-            success = await self._client.play_pause()
+            ok = await client.play_pause()
         elif command == "NEXT":
-            success = await self._client.next_track()
+            ok = await client.next_track()
         elif command == "PREVIOUS":
-            success = await self._client.previous_track()
+            ok = await client.previous_track()
         elif command == "VOLUME_UP":
-            current_state = await self._client.get_playback_state()
-            if current_state:
-                if not current_state.get("supports_volume", False):
-                    _LOG.info("Active device does not support volume control")
-                    return ucapi.StatusCodes.NOT_IMPLEMENTED
-                current_volume = current_state.get("volume_percent", 50)
-                new_volume = min(100, current_volume + 10)
-                success = await self._client.set_volume(new_volume)
-            else:
-                success = False
+            new_vol = min(100, self._device._volume + 10)
+            ok = await client.set_volume(new_vol)
         elif command == "VOLUME_DOWN":
-            current_state = await self._client.get_playback_state()
-            if current_state:
-                if not current_state.get("supports_volume", False):
-                    _LOG.info("Active device does not support volume control")
-                    return ucapi.StatusCodes.NOT_IMPLEMENTED
-                current_volume = current_state.get("volume_percent", 50)
-                new_volume = max(0, current_volume - 10)
-                success = await self._client.set_volume(new_volume)
-            else:
-                success = False
+            new_vol = max(0, self._device._volume - 10)
+            ok = await client.set_volume(new_vol)
+        elif command == "SHUFFLE":
+            ok = await client.set_shuffle(not self._device._shuffle)
+        elif command == "REPEAT":
+            cycle = {"off": "context", "context": "track", "track": "off"}
+            ok = await client.set_repeat(cycle.get(self._device._repeat, "off"))
         else:
             _LOG.warning("Unknown remote command: %s", command)
-            return ucapi.StatusCodes.NOT_IMPLEMENTED
-        
-        return ucapi.StatusCodes.OK if success else ucapi.StatusCodes.SERVER_ERROR
+            return StatusCodes.NOT_IMPLEMENTED
+
+        return StatusCodes.OK if ok else StatusCodes.SERVER_ERROR
+
+
+def _create_ui_pages() -> list[UiPage]:
+    main = UiPage(page_id="main", name="Spotify Controls", grid=Size(4, 6))
+    main.add(create_ui_icon("uc:play-pause", 1, 1, Size(2, 1), "PLAY_PAUSE"))
+    main.add(create_ui_icon("uc:backward", 0, 2, Size(1, 1), "PREVIOUS"))
+    main.add(create_ui_icon("uc:forward", 3, 2, Size(1, 1), "NEXT"))
+    main.add(create_ui_icon("uc:volume-high", 1, 3, Size(1, 1), "VOLUME_UP"))
+    main.add(create_ui_icon("uc:volume-low", 2, 3, Size(1, 1), "VOLUME_DOWN"))
+    main.add(create_ui_icon("uc:shuffle", 0, 4, Size(1, 1), "SHUFFLE"))
+    main.add(create_ui_icon("uc:repeat", 3, 4, Size(1, 1), "REPEAT"))
+    return [main]

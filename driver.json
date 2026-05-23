@@ -1,12 +1,13 @@
 {
   "driver_id": "spotify",
-  "version": "1.0.7",
-  "min_core_api": "0.3.1",
+  "version": "2.0.0",
+  "min_core_api": "0.22.0",
   "name": {
     "en": "Spotify"
   },
+  "icon": "uc:cloud-music",
   "description": {
-    "en": "Control Spotify playback and view currently playing track information."
+    "en": "Control Spotify playback with media browsing, search, and library access."
   },
   "developer": {
     "name": "Meir Miyara",
@@ -14,51 +15,25 @@
     "url": "https://github.com/mase1981"
   },
   "home_page": "https://github.com/mase1981/uc-intg-spotify",
-  "documentation": "https://github.com/mase1981/uc-intg-spotify/blob/main/README.md",
   "setup_data_schema": {
     "title": {
       "en": "Spotify Setup"
     },
     "settings": [
       {
-        "id": "instructions",
+        "id": "info",
         "label": {
-          "en": "Setup Instructions"
+          "en": "Setup Information"
         },
         "field": {
           "label": {
             "value": {
-              "en": "IMPORTANT: Spotify Premium is required (API no longer supports Free accounts as of Feb 2026).\n\nCreate a Spotify Developer App:\n\n1. Go to https://developer.spotify.com/dashboard\n2. Log in with your Premium Spotify account\n3. Click 'Create App'\n4. App Name: 'UC Remote Integration'\n5. App Description: 'Unfolded Circle Remote integration'\n6. Redirect URI: https://example.com/callback\n7. Check 'Web API' and save\n8. Copy your Client ID and Client Secret below"
+              "en": "Enter your Spotify Developer App credentials on the next screen."
             }
-          }
-        }
-      },
-      {
-        "id": "client_id",
-        "label": {
-          "en": "Spotify Client ID"
-        },
-        "field": {
-          "text": {
-            "value": "",
-            "placeholder": "Enter your Spotify app Client ID"
-          }
-        }
-      },
-      {
-        "id": "client_secret",
-        "label": {
-          "en": "Spotify Client Secret"
-        },
-        "field": {
-          "text": {
-            "value": "",
-            "placeholder": "Enter your Spotify app Client Secret"
           }
         }
       }
     ]
   },
-  "release_date": "2024-08-06",
-  "icon": "uc:cloud-music"
+  "release_date": "2026-05-23"
 }
