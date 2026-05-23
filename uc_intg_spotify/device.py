@@ -38,6 +38,10 @@ class SpotifyDevice(PollingDevice):
         self._repeat: str = "off"
         self._media_uri: str = ""
 
+        self._source_name: str = ""
+        self._source_list: list[str] = []
+        self._devices: list[dict[str, Any]] = []
+
     @property
     def identifier(self) -> str:
         return self._device_config.identifier
@@ -57,6 +61,17 @@ class SpotifyDevice(PollingDevice):
     @property
     def client(self) -> SpotifyClient | None:
         return self._client
+
+    def get_device_id_by_name(self, name: str) -> str | None:
+        for dev in self._devices:
+            if dev.get("name") == name:
+                return dev.get("id", "")
+        return None
+
+    def get_first_available_device_id(self) -> str | None:
+        if self._devices:
+            return self._devices[0].get("id")
+        return None
 
     async def establish_connection(self) -> None:
         cfg = self._device_config
@@ -80,6 +95,7 @@ class SpotifyDevice(PollingDevice):
         try:
             track_data = await self._client.get_currently_playing()
             playback = await self._client.get_playback_state()
+            devices = await self._client.get_available_devices()
 
             if track_data:
                 self._is_playing = track_data.get("is_playing", False)
@@ -107,6 +123,10 @@ class SpotifyDevice(PollingDevice):
                 self._muted = self._volume == 0
                 self._shuffle = playback.get("shuffle_state", False)
                 self._repeat = playback.get("repeat_state", "off")
+                self._source_name = playback.get("device_name", "")
+
+            self._devices = devices
+            self._source_list = [d.get("name", "") for d in devices if d.get("name")]
 
             self.push_update()
 

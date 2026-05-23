@@ -6,6 +6,7 @@ from typing import Any, TYPE_CHECKING
 
 from ucapi import media_player, StatusCodes
 from ucapi.media_player import BrowseOptions, BrowseResults, SearchOptions, SearchResults
+
 from ucapi_framework import MediaPlayerEntity
 
 from uc_intg_spotify import browser
@@ -36,6 +37,7 @@ FEATURES = [
     media_player.Features.PLAY_MEDIA,
     media_player.Features.BROWSE_MEDIA,
     media_player.Features.SEARCH_MEDIA,
+    media_player.Features.SELECT_SOURCE,
 ]
 
 
@@ -63,6 +65,8 @@ class SpotifyMediaPlayer(MediaPlayerEntity):
                 media_player.Attributes.MEDIA_POSITION: 0,
                 media_player.Attributes.SHUFFLE: False,
                 media_player.Attributes.REPEAT: media_player.RepeatMode.OFF,
+                media_player.Attributes.SOURCE: "",
+                media_player.Attributes.SOURCE_LIST: [],
             },
             device_class=media_player.DeviceClasses.SPEAKER,
             cmd_handler=self._handle_command,
@@ -89,6 +93,8 @@ class SpotifyMediaPlayer(MediaPlayerEntity):
             media_player.Attributes.MEDIA_POSITION: dev._position,
             media_player.Attributes.SHUFFLE: dev._shuffle,
             media_player.Attributes.REPEAT: repeat,
+            media_player.Attributes.SOURCE: dev._source_name,
+            media_player.Attributes.SOURCE_LIST: dev._source_list,
         })
 
     async def browse(self, options: BrowseOptions) -> BrowseResults | StatusCodes:
@@ -161,11 +167,30 @@ class SpotifyMediaPlayer(MediaPlayerEntity):
             ok = await client.set_repeat(new_state)
             return StatusCodes.OK if ok else StatusCodes.SERVER_ERROR
 
+        if cmd_id == media_player.Commands.SELECT_SOURCE:
+            return await self._handle_select_source(client, params)
+
         if cmd_id == media_player.Commands.PLAY_MEDIA:
             return await self._handle_play_media(client, params)
 
         _LOG.warning("Unhandled command: %s", cmd_id)
         return StatusCodes.NOT_IMPLEMENTED
+
+    async def _handle_select_source(self, client, params: dict[str, Any] | None) -> StatusCodes:
+        if not params:
+            return StatusCodes.BAD_REQUEST
+
+        source = params.get("source", "")
+        if not source:
+            return StatusCodes.BAD_REQUEST
+
+        device_id = self._device.get_device_id_by_name(source)
+        if not device_id:
+            _LOG.warning("Device not found: %s", source)
+            return StatusCodes.BAD_REQUEST
+
+        ok = await client.transfer_playback(device_id)
+        return StatusCodes.OK if ok else StatusCodes.SERVER_ERROR
 
     async def _handle_play_media(self, client, params: dict[str, Any] | None) -> StatusCodes:
         if not params:
@@ -189,5 +214,9 @@ class SpotifyMediaPlayer(MediaPlayerEntity):
             _LOG.warning("Unknown media_id format: %s", media_id)
             return StatusCodes.BAD_REQUEST
 
-        ok = await client.play_uri(uri)
+        device_id = None
+        if not self._device._is_playing:
+            device_id = self._device.get_first_available_device_id()
+
+        ok = await client.play_uri(uri, device_id)
         return StatusCodes.OK if ok else StatusCodes.SERVER_ERROR

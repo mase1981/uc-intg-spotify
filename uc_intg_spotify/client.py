@@ -4,6 +4,7 @@ from __future__ import annotations
 import base64
 import logging
 import ssl
+import urllib.parse
 from typing import Any
 
 import aiohttp
@@ -25,6 +26,9 @@ SCOPES = [
     "user-library-read",
     "playlist-read-private",
     "playlist-read-collaborative",
+    "user-top-read",
+    "user-read-recently-played",
+    "user-follow-read",
 ]
 
 
@@ -61,13 +65,11 @@ class SpotifyClient:
             self._session = aiohttp.ClientSession(
                 connector=connector,
                 timeout=timeout,
-                headers={"User-Agent": "UC-Spotify-Integration/2.0.0"},
+                headers={"User-Agent": "UC-Spotify-Integration/2.1.0"},
             )
         return self._session
 
     def get_authorization_url(self, client_id: str) -> str:
-        import urllib.parse
-
         params = {
             "response_type": "code",
             "client_id": client_id,
@@ -213,6 +215,7 @@ class SpotifyClient:
             "is_playing": data.get("is_playing", False),
             "volume_percent": device.get("volume_percent", 50),
             "device_name": device.get("name", "Unknown"),
+            "device_id": device.get("id", ""),
             "supports_volume": device.get("supports_volume", False),
             "shuffle_state": data.get("shuffle_state", False),
             "repeat_state": data.get("repeat_state", "off"),
@@ -258,39 +261,28 @@ class SpotifyClient:
             "PUT", f"/me/player/repeat?state={state}"
         ) is not None
 
-    async def play_uri(self, uri: str) -> bool:
+    async def play_uri(self, uri: str, device_id: str | None = None) -> bool:
         if uri.startswith("spotify:track:"):
             body: dict[str, Any] = {"uris": [uri]}
         else:
             body = {"context_uri": uri}
 
-        result = await self._api_request("PUT", "/me/player/play", json=body)
-        if result is not None:
-            return True
-
-        device_id = await self._get_first_available_device()
+        endpoint = "/me/player/play"
         if device_id:
-            _LOG.info("No active device, playing on %s", device_id)
-            result = await self._api_request(
-                "PUT", f"/me/player/play?device_id={device_id}", json=body
-            )
-            return result is not None
+            endpoint = f"/me/player/play?device_id={device_id}"
 
-        _LOG.warning("No available Spotify devices to play on")
-        return False
+        return await self._api_request("PUT", endpoint, json=body) is not None
+
+    async def transfer_playback(self, device_id: str) -> bool:
+        return await self._api_request(
+            "PUT", "/me/player", json={"device_ids": [device_id], "play": False}
+        ) is not None
 
     async def get_available_devices(self) -> list[dict[str, Any]]:
         data = await self._api_request("GET", "/me/player/devices")
         if data and "devices" in data:
             return data["devices"]
         return []
-
-    async def _get_first_available_device(self) -> str | None:
-        devices = await self.get_available_devices()
-        for dev in devices:
-            if dev.get("id"):
-                return dev["id"]
-        return None
 
     # ── Browse / Library ──
 
@@ -301,12 +293,8 @@ class SpotifyClient:
             "GET", f"/me/playlists?limit={limit}&offset={offset}"
         )
 
-    async def get_playlist_tracks(
-        self, playlist_id: str, limit: int = 50, offset: int = 0
-    ) -> dict[str, Any] | None:
-        return await self._api_request(
-            "GET", f"/playlists/{playlist_id}/tracks?limit={limit}&offset={offset}"
-        )
+    async def get_playlist(self, playlist_id: str) -> dict[str, Any] | None:
+        return await self._api_request("GET", f"/playlists/{playlist_id}")
 
     async def get_saved_tracks(
         self, limit: int = 50, offset: int = 0
@@ -339,18 +327,37 @@ class SpotifyClient:
             f"/artists/{artist_id}/albums?include_groups=album,single&limit={limit}&offset={offset}",
         )
 
-    async def get_new_releases(
+    async def get_recently_played(
+        self, limit: int = 50
+    ) -> dict[str, Any] | None:
+        return await self._api_request(
+            "GET", f"/me/player/recently-played?limit={limit}"
+        )
+
+    async def get_top_artists(
         self, limit: int = 50, offset: int = 0
     ) -> dict[str, Any] | None:
         return await self._api_request(
-            "GET", f"/search?q=tag%3Anew&type=album&limit={limit}&offset={offset}"
+            "GET", f"/me/top/artists?limit={limit}&offset={offset}"
+        )
+
+    async def get_top_tracks(
+        self, limit: int = 50, offset: int = 0
+    ) -> dict[str, Any] | None:
+        return await self._api_request(
+            "GET", f"/me/top/tracks?limit={limit}&offset={offset}"
+        )
+
+    async def get_followed_artists(
+        self, limit: int = 50
+    ) -> dict[str, Any] | None:
+        return await self._api_request(
+            "GET", f"/me/following?type=artist&limit={limit}"
         )
 
     async def search(
         self, query: str, limit: int = 20, offset: int = 0
     ) -> dict[str, Any] | None:
-        import urllib.parse
-
         encoded = urllib.parse.quote(query)
         return await self._api_request(
             "GET",

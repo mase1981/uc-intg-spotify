@@ -22,10 +22,13 @@ if TYPE_CHECKING:
 _LOG = logging.getLogger(__name__)
 
 ROOT_ITEMS = [
-    ("playlists", "Your Playlists", MediaClass.PLAYLIST),
+    ("playlists", "Playlists", MediaClass.PLAYLIST),
     ("saved_tracks", "Liked Songs", MediaClass.TRACK),
-    ("saved_albums", "Saved Albums", MediaClass.ALBUM),
-    ("new_releases", "New Releases", MediaClass.ALBUM),
+    ("saved_albums", "Albums", MediaClass.ALBUM),
+    ("recently_played", "Recently Played", MediaClass.TRACK),
+    ("top_tracks", "Top Tracks", MediaClass.TRACK),
+    ("top_artists", "Top Artists", MediaClass.ARTIST),
+    ("followed_artists", "Artists", MediaClass.ARTIST),
 ]
 
 
@@ -47,8 +50,17 @@ async def browse(client: SpotifyClient, options: BrowseOptions) -> BrowseResults
     if media_id == "saved_albums":
         return await _browse_saved_albums(client, options)
 
-    if media_id == "new_releases":
-        return await _browse_new_releases(client, options)
+    if media_id == "recently_played":
+        return await _browse_recently_played(client, options)
+
+    if media_id == "top_tracks":
+        return await _browse_top_tracks(client, options)
+
+    if media_id == "top_artists":
+        return await _browse_top_artists(client, options)
+
+    if media_id == "followed_artists":
+        return await _browse_followed_artists(client, options)
 
     if media_id.startswith("playlist_"):
         playlist_id = media_id[9:]
@@ -147,7 +159,7 @@ async def _browse_playlists(client: SpotifyClient, options: BrowseOptions) -> Br
 
     data = await client.get_user_playlists(limit=limit, offset=offset)
     if not data:
-        return _empty_browse("playlists", "Your Playlists", page, limit)
+        return _empty_browse("playlists", "Playlists", page, limit)
 
     items = []
     for playlist in data.get("items", []):
@@ -158,7 +170,7 @@ async def _browse_playlists(client: SpotifyClient, options: BrowseOptions) -> Br
     total = data.get("total", 0)
     return BrowseResults(
         media=BrowseMediaItem(
-            title="Your Playlists",
+            title="Playlists",
             media_class=MediaClass.PLAYLIST,
             media_type="directory",
             media_id="playlists",
@@ -208,7 +220,7 @@ async def _browse_saved_albums(client: SpotifyClient, options: BrowseOptions) ->
 
     data = await client.get_saved_albums(limit=limit, offset=offset)
     if not data:
-        return _empty_browse("saved_albums", "Saved Albums", page, limit)
+        return _empty_browse("saved_albums", "Albums", page, limit)
 
     items = []
     for saved in data.get("items", []):
@@ -221,7 +233,7 @@ async def _browse_saved_albums(client: SpotifyClient, options: BrowseOptions) ->
     total = data.get("total", 0)
     return BrowseResults(
         media=BrowseMediaItem(
-            title="Saved Albums",
+            title="Albums",
             media_class=MediaClass.ALBUM,
             media_type="directory",
             media_id="saved_albums",
@@ -232,29 +244,56 @@ async def _browse_saved_albums(client: SpotifyClient, options: BrowseOptions) ->
     )
 
 
-async def _browse_new_releases(client: SpotifyClient, options: BrowseOptions) -> BrowseResults:
+async def _browse_recently_played(client: SpotifyClient, options: BrowseOptions) -> BrowseResults:
+    limit = _get_limit(options)
+
+    data = await client.get_recently_played(limit=limit)
+    if not data:
+        return _empty_browse("recently_played", "Recently Played", 1, limit)
+
+    items = []
+    for entry in data.get("items", []):
+        track = entry.get("track")
+        if track:
+            item = _track_to_browse_item(track)
+            if item:
+                items.append(item)
+
+    return BrowseResults(
+        media=BrowseMediaItem(
+            title="Recently Played",
+            media_class=MediaClass.TRACK,
+            media_type="directory",
+            media_id="recently_played",
+            can_browse=True,
+            items=items,
+        ),
+        pagination=Pagination(page=1, limit=len(items), count=len(items)),
+    )
+
+
+async def _browse_top_tracks(client: SpotifyClient, options: BrowseOptions) -> BrowseResults:
     page = _get_page(options)
     limit = _get_limit(options)
     offset = (page - 1) * limit
 
-    data = await client.get_new_releases(limit=limit, offset=offset)
+    data = await client.get_top_tracks(limit=limit, offset=offset)
     if not data:
-        return _empty_browse("new_releases", "New Releases", page, limit)
+        return _empty_browse("top_tracks", "Top Tracks", page, limit)
 
-    albums_data = data.get("albums", data)
     items = []
-    for album in albums_data.get("items", []):
-        item = _album_to_browse_item(album)
+    for track in data.get("items", []):
+        item = _track_to_browse_item(track)
         if item:
             items.append(item)
 
-    total = albums_data.get("total", 0)
+    total = data.get("total", 0)
     return BrowseResults(
         media=BrowseMediaItem(
-            title="New Releases",
-            media_class=MediaClass.ALBUM,
+            title="Top Tracks",
+            media_class=MediaClass.TRACK,
             media_type="directory",
-            media_id="new_releases",
+            media_id="top_tracks",
             can_browse=True,
             items=items,
         ),
@@ -262,36 +301,96 @@ async def _browse_new_releases(client: SpotifyClient, options: BrowseOptions) ->
     )
 
 
-async def _browse_playlist_tracks(
-    client: SpotifyClient, playlist_id: str, options: BrowseOptions
-) -> BrowseResults:
+async def _browse_top_artists(client: SpotifyClient, options: BrowseOptions) -> BrowseResults:
     page = _get_page(options)
     limit = _get_limit(options)
     offset = (page - 1) * limit
 
-    data = await client.get_playlist_tracks(playlist_id, limit=limit, offset=offset)
+    data = await client.get_top_artists(limit=limit, offset=offset)
     if not data:
-        return _empty_browse(f"playlist_{playlist_id}", "Playlist", page, limit)
+        return _empty_browse("top_artists", "Top Artists", page, limit)
 
     items = []
-    for item_data in data.get("items", []):
+    for artist in data.get("items", []):
+        item = _artist_to_browse_item(artist)
+        if item:
+            items.append(item)
+
+    total = data.get("total", 0)
+    return BrowseResults(
+        media=BrowseMediaItem(
+            title="Top Artists",
+            media_class=MediaClass.ARTIST,
+            media_type="directory",
+            media_id="top_artists",
+            can_browse=True,
+            items=items,
+        ),
+        pagination=Pagination(page=page, limit=limit, count=total),
+    )
+
+
+async def _browse_followed_artists(client: SpotifyClient, options: BrowseOptions) -> BrowseResults:
+    limit = _get_limit(options)
+
+    data = await client.get_followed_artists(limit=limit)
+    if not data:
+        return _empty_browse("followed_artists", "Artists", 1, limit)
+
+    artists_data = data.get("artists", {})
+    items = []
+    for artist in artists_data.get("items", []):
+        item = _artist_to_browse_item(artist)
+        if item:
+            items.append(item)
+
+    total = artists_data.get("total", len(items))
+    return BrowseResults(
+        media=BrowseMediaItem(
+            title="Artists",
+            media_class=MediaClass.ARTIST,
+            media_type="directory",
+            media_id="followed_artists",
+            can_browse=True,
+            items=items,
+        ),
+        pagination=Pagination(page=1, limit=len(items), count=total),
+    )
+
+
+async def _browse_playlist_tracks(
+    client: SpotifyClient, playlist_id: str, options: BrowseOptions
+) -> BrowseResults:
+    data = await client.get_playlist(playlist_id)
+    if not data:
+        return _empty_browse(f"playlist_{playlist_id}", "Playlist", 1, 50)
+
+    playlist_name = data.get("name", "Playlist")
+    playlist_images = data.get("images", [])
+    playlist_thumbnail = playlist_images[0]["url"] if playlist_images else None
+
+    tracks_data = data.get("tracks", {})
+    items = []
+    for item_data in tracks_data.get("items", []):
         track = item_data.get("track")
         if track and track.get("type") == "track":
             item = _track_to_browse_item(track)
             if item:
                 items.append(item)
 
-    total = data.get("total", 0)
+    total = tracks_data.get("total", len(items))
     return BrowseResults(
         media=BrowseMediaItem(
-            title="Playlist",
+            title=playlist_name,
             media_class=MediaClass.PLAYLIST,
             media_type="playlist",
             media_id=f"playlist_{playlist_id}",
             can_browse=True,
+            can_play=True,
+            thumbnail=playlist_thumbnail,
             items=items,
         ),
-        pagination=Pagination(page=page, limit=limit, count=total),
+        pagination=Pagination(page=1, limit=total, count=total),
     )
 
 

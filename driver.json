@@ -1,6 +1,6 @@
 {
   "driver_id": "spotify",
-  "version": "2.0.5",
+  "version": "2.1.0",
   "min_core_api": "0.22.0",
   "name": {
     "en": "Spotify"
