@@ -275,7 +275,7 @@ class SpotifyClient:
 
     async def transfer_playback(self, device_id: str) -> bool:
         return await self._api_request(
-            "PUT", "/me/player", json={"device_ids": [device_id], "play": False}
+            "PUT", "/me/player", json={"device_ids": [device_id], "play": True}
         ) is not None
 
     async def get_available_devices(self) -> list[dict[str, Any]]:

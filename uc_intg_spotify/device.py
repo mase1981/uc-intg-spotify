@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import time
 from typing import Any
 
@@ -13,6 +14,16 @@ from uc_intg_spotify.config import SpotifyDeviceConfig
 _LOG = logging.getLogger(__name__)
 
 TRACK_END_SETTLE_SECONDS = 1.5
+_HEX_HASH_RE = re.compile(r"^[0-9a-f]{32,}$", re.IGNORECASE)
+
+
+def _device_display_name(dev: dict[str, Any]) -> str:
+    name = dev.get("name", "")
+    if name and not _HEX_HASH_RE.match(name):
+        return name
+    dev_type = dev.get("type", "Device")
+    dev_id = dev.get("id", "")
+    return f"{dev_type} ({dev_id[:8]})" if dev_id else dev_type
 
 
 class SpotifyDevice(PollingDevice):
@@ -64,7 +75,7 @@ class SpotifyDevice(PollingDevice):
 
     def get_device_id_by_name(self, name: str) -> str | None:
         for dev in self._devices:
-            if dev.get("name") == name:
+            if _device_display_name(dev) == name:
                 return dev.get("id", "")
         return None
 
@@ -123,10 +134,12 @@ class SpotifyDevice(PollingDevice):
                 self._muted = self._volume == 0
                 self._shuffle = playback.get("shuffle_state", False)
                 self._repeat = playback.get("repeat_state", "off")
-                self._source_name = playback.get("device_name", "")
+                active_id = playback.get("device_id", "")
+                active_dev = next((d for d in devices if d.get("id") == active_id), None)
+                self._source_name = _device_display_name(active_dev) if active_dev else playback.get("device_name", "")
 
             self._devices = devices
-            self._source_list = [d.get("name", "") for d in devices if d.get("name")]
+            self._source_list = [_device_display_name(d) for d in devices if d.get("id")]
 
             self.push_update()
 
