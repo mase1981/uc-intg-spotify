@@ -5,6 +5,8 @@ from uc_intg_spotify.config import SpotifyDeviceConfig
 from uc_intg_spotify.device import SpotifyDevice
 from uc_intg_spotify.media_player import SpotifyMediaPlayer
 from uc_intg_spotify.remote import SpotifyRemote
+from uc_intg_spotify.select import SpotifyDeviceSelect
+from uc_intg_spotify.sensor import SpotifyNowPlayingSensor, SpotifyDeviceSensor
 
 
 class SpotifyDriver(BaseIntegrationDriver[SpotifyDevice, SpotifyDeviceConfig]):
@@ -16,6 +18,9 @@ class SpotifyDriver(BaseIntegrationDriver[SpotifyDevice, SpotifyDeviceConfig]):
             entity_classes=[
                 SpotifyMediaPlayer,
                 SpotifyRemote,
+                SpotifyDeviceSelect,
+                SpotifyNowPlayingSensor,
+                SpotifyDeviceSensor,
             ],
             driver_id="spotify",
             require_connection_before_registry=True,

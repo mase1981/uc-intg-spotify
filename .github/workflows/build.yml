@@ -65,6 +65,8 @@ jobs:
                 --hidden-import uc_intg_${INTG_NAME}.remote \
                 --hidden-import uc_intg_${INTG_NAME}.browser \
                 --hidden-import uc_intg_${INTG_NAME}.setup \
+                --hidden-import uc_intg_${INTG_NAME}.select \
+                --hidden-import uc_intg_${INTG_NAME}.sensor \
                 --paths . \
                 uc_intg_${INTG_NAME}/__init__.py"
 

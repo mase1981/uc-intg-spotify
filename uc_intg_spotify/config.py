@@ -13,4 +13,4 @@ class SpotifyDeviceConfig:
     access_token: str = ""
     refresh_token: str = ""
     token_expires_at: int = 0
-    polling_interval: int = 30
+    polling_interval: int = 10

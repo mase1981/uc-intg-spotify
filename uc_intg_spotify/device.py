@@ -13,24 +13,40 @@ from uc_intg_spotify.config import SpotifyDeviceConfig
 
 _LOG = logging.getLogger(__name__)
 
-TRACK_END_SETTLE_SECONDS = 1.5
 _HEX_HASH_RE = re.compile(r"^[0-9a-f]{32,}$", re.IGNORECASE)
 
+_DEVICE_TYPE_LABELS = {
+    "Computer": "Computer",
+    "Smartphone": "Phone",
+    "Tablet": "Tablet",
+    "Speaker": "Speaker",
+    "TV": "TV",
+    "AVR": "Receiver",
+    "STB": "Set-Top Box",
+    "AudioDongle": "Audio Dongle",
+    "GameConsole": "Game Console",
+    "CastVideo": "Chromecast",
+    "CastAudio": "Cast Audio",
+    "Automobile": "Car",
+}
 
-def _device_display_name(dev: dict[str, Any]) -> str:
+
+def device_display_name(dev: dict[str, Any]) -> str:
+    """Build a user-friendly display name for a Spotify Connect device."""
     name = dev.get("name", "")
     if name and not _HEX_HASH_RE.match(name):
         return name
     dev_type = dev.get("type", "Device")
+    label = _DEVICE_TYPE_LABELS.get(dev_type, dev_type)
     dev_id = dev.get("id", "")
-    return f"{dev_type} ({dev_id[:8]})" if dev_id else dev_type
+    return f"{label} ({dev_id[:6]})" if dev_id else label
 
 
 class SpotifyDevice(PollingDevice):
     """Spotify cloud device using polling for playback state updates."""
 
     def __init__(self, device_config: SpotifyDeviceConfig, **kwargs: Any) -> None:
-        poll_interval = device_config.polling_interval or 30
+        poll_interval = device_config.polling_interval or 10
         super().__init__(device_config, poll_interval=poll_interval, **kwargs)
         self._device_config: SpotifyDeviceConfig = device_config
         self._client: SpotifyClient | None = None
@@ -43,15 +59,18 @@ class SpotifyDevice(PollingDevice):
         self._image_url: str = ""
         self._duration: int = 0
         self._position: int = 0
-        self._volume: int = 50
-        self._muted: bool = False
+        self._volume: int = 0
         self._shuffle: bool = False
         self._repeat: str = "off"
         self._media_uri: str = ""
+        self._context_uri: str = ""
+        self._context_type: str = ""
+        self._media_type: str = "track"
 
         self._source_name: str = ""
         self._source_list: list[str] = []
         self._devices: list[dict[str, Any]] = []
+        self._disallows: dict[str, bool] = {}
 
     @property
     def identifier(self) -> str:
@@ -75,7 +94,7 @@ class SpotifyDevice(PollingDevice):
 
     def get_device_id_by_name(self, name: str) -> str | None:
         for dev in self._devices:
-            if _device_display_name(dev) == name:
+            if device_display_name(dev) == name:
                 return dev.get("id", "")
         return None
 
@@ -104,22 +123,42 @@ class SpotifyDevice(PollingDevice):
             return
 
         try:
-            track_data = await self._client.get_currently_playing()
             playback = await self._client.get_playback_state()
             devices = await self._client.get_available_devices()
 
-            if track_data:
-                self._is_playing = track_data.get("is_playing", False)
-                self._title = track_data.get("title", "")
-                self._artist = ", ".join(track_data.get("artists", []))
-                self._album = track_data.get("album", "")
-                self._image_url = track_data.get("image_url", "")
-                self._duration = track_data.get("duration_ms", 0) // 1000
-                self._position = track_data.get("progress_ms", 0) // 1000
-                self._media_uri = track_data.get("uri", "")
+            if playback and playback.get("title"):
+                self._is_playing = playback.get("is_playing", False)
+                self._title = playback.get("title", "")
+                self._artist = ", ".join(playback.get("artists", []))
+                self._album = playback.get("album", "")
+                self._image_url = playback.get("image_url", "")
+                self._duration = playback.get("duration_ms", 0) // 1000
+                self._position = playback.get("progress_ms", 0) // 1000
+                self._volume = playback.get("volume_percent", 0)
+                self._shuffle = playback.get("shuffle_state", False)
+                self._repeat = playback.get("repeat_state", "off")
+                self._media_uri = playback.get("uri", "")
+                self._media_type = playback.get("currently_playing_type", "track")
+                self._disallows = playback.get("disallows", {})
                 self._state = "PLAYING" if self._is_playing else "PAUSED"
-            else:
+
+                ctx = playback.get("context")
+                if ctx:
+                    self._context_uri = ctx.get("uri", "")
+                    self._context_type = ctx.get("type", "")
+                else:
+                    self._context_uri = ""
+                    self._context_type = ""
+
+                active_id = playback.get("device_id", "")
+                active_dev = next((d for d in devices if d.get("id") == active_id), None)
+                if active_dev:
+                    self._source_name = device_display_name(active_dev)
+                else:
+                    self._source_name = playback.get("device_name", "")
+            elif playback:
                 self._state = "ON"
+                self._is_playing = False
                 self._title = ""
                 self._artist = ""
                 self._album = ""
@@ -127,19 +166,24 @@ class SpotifyDevice(PollingDevice):
                 self._duration = 0
                 self._position = 0
                 self._media_uri = ""
-                self._is_playing = False
-
-            if playback:
-                self._volume = playback.get("volume_percent", 50)
-                self._muted = self._volume == 0
+                self._volume = playback.get("volume_percent", 0)
                 self._shuffle = playback.get("shuffle_state", False)
                 self._repeat = playback.get("repeat_state", "off")
-                active_id = playback.get("device_id", "")
-                active_dev = next((d for d in devices if d.get("id") == active_id), None)
-                self._source_name = _device_display_name(active_dev) if active_dev else playback.get("device_name", "")
+                self._disallows = playback.get("disallows", {})
+            else:
+                self._state = "ON"
+                self._is_playing = False
+                self._title = ""
+                self._artist = ""
+                self._album = ""
+                self._image_url = ""
+                self._duration = 0
+                self._position = 0
+                self._media_uri = ""
+                self._disallows = {}
 
             self._devices = devices
-            self._source_list = [_device_display_name(d) for d in devices if d.get("id")]
+            self._source_list = [device_display_name(d) for d in devices if d.get("id")]
 
             self.push_update()
 

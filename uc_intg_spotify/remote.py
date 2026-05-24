@@ -5,7 +5,7 @@ import logging
 from typing import Any, TYPE_CHECKING
 
 from ucapi import remote, StatusCodes
-from ucapi.ui import Buttons, Size, UiPage, create_btn_mapping, create_ui_icon
+from ucapi.ui import Buttons, Size, UiPage, create_btn_mapping, create_ui_icon, create_ui_text
 from ucapi_framework import RemoteEntity
 
 if TYPE_CHECKING:
@@ -16,12 +16,15 @@ _LOG = logging.getLogger(__name__)
 
 SIMPLE_COMMANDS = [
     "PLAY_PAUSE",
+    "PLAY",
+    "PAUSE",
     "NEXT",
     "PREVIOUS",
     "VOLUME_UP",
     "VOLUME_DOWN",
     "SHUFFLE",
     "REPEAT",
+    "ADD_TO_QUEUE",
 ]
 
 
@@ -35,8 +38,8 @@ class SpotifyRemote(RemoteEntity):
         super().__init__(
             entity_id,
             "Spotify Remote",
-            features=[remote.Features.ON_OFF, remote.Features.SEND_CMD],
-            attributes={"state": remote.States.ON},
+            features=[remote.Features.SEND_CMD],
+            attributes={remote.Attributes.STATE: remote.States.UNAVAILABLE},
             simple_commands=SIMPLE_COMMANDS,
             button_mapping=[
                 create_btn_mapping(Buttons.PLAY, "PLAY_PAUSE"),
@@ -53,7 +56,7 @@ class SpotifyRemote(RemoteEntity):
     async def sync_state(self) -> None:
         has_client = self._device.client is not None and self._device.client.is_authenticated()
         state = remote.States.ON if has_client else remote.States.OFF
-        self.update({"state": state})
+        self.update({remote.Attributes.STATE: state})
 
     async def _handle_command(
         self, entity: remote.Remote, cmd_id: str, params: dict[str, Any] | None
@@ -63,12 +66,6 @@ class SpotifyRemote(RemoteEntity):
             return StatusCodes.SERVICE_UNAVAILABLE
 
         try:
-            if cmd_id == remote.Commands.ON:
-                self.update({"state": remote.States.ON})
-                return StatusCodes.OK
-            if cmd_id == remote.Commands.OFF:
-                self.update({"state": remote.States.OFF})
-                return StatusCodes.OK
             if cmd_id == remote.Commands.SEND_CMD:
                 return await self._handle_send_cmd(client, params)
             return StatusCodes.NOT_IMPLEMENTED
@@ -84,17 +81,30 @@ class SpotifyRemote(RemoteEntity):
         ok = False
 
         if command == "PLAY_PAUSE":
-            ok = await client.play_pause()
+            if self._device._is_playing:
+                ok = await client.pause()
+            else:
+                device_id = self._device.get_first_available_device_id()
+                ok = await client.play(device_id)
+        elif command == "PLAY":
+            device_id = self._device.get_first_available_device_id() if not self._device._is_playing else None
+            ok = await client.play(device_id)
+        elif command == "PAUSE":
+            ok = await client.pause()
         elif command == "NEXT":
             ok = await client.next_track()
         elif command == "PREVIOUS":
             ok = await client.previous_track()
         elif command == "VOLUME_UP":
-            new_vol = min(100, self._device._volume + 10)
+            new_vol = min(100, self._device._volume + 1)
             ok = await client.set_volume(new_vol)
+            if ok:
+                self._device._volume = new_vol
         elif command == "VOLUME_DOWN":
-            new_vol = max(0, self._device._volume - 10)
+            new_vol = max(0, self._device._volume - 1)
             ok = await client.set_volume(new_vol)
+            if ok:
+                self._device._volume = new_vol
         elif command == "SHUFFLE":
             ok = await client.set_shuffle(not self._device._shuffle)
         elif command == "REPEAT":
@@ -108,12 +118,12 @@ class SpotifyRemote(RemoteEntity):
 
 
 def _create_ui_pages() -> list[UiPage]:
-    main = UiPage(page_id="main", name="Spotify Controls", grid=Size(4, 6))
-    main.add(create_ui_icon("uc:play-pause", 1, 1, Size(2, 1), "PLAY_PAUSE"))
-    main.add(create_ui_icon("uc:backward", 0, 2, Size(1, 1), "PREVIOUS"))
-    main.add(create_ui_icon("uc:forward", 3, 2, Size(1, 1), "NEXT"))
-    main.add(create_ui_icon("uc:volume-high", 1, 3, Size(1, 1), "VOLUME_UP"))
-    main.add(create_ui_icon("uc:volume-low", 2, 3, Size(1, 1), "VOLUME_DOWN"))
-    main.add(create_ui_icon("uc:shuffle", 0, 4, Size(1, 1), "SHUFFLE"))
-    main.add(create_ui_icon("uc:repeat", 3, 4, Size(1, 1), "REPEAT"))
+    main = UiPage(page_id="main", name="Playback", grid=Size(4, 6))
+    main.add(create_ui_icon("uc:backward", 0, 1, Size(2, 1), "PREVIOUS"))
+    main.add(create_ui_icon("uc:forward", 2, 1, Size(2, 1), "NEXT"))
+    main.add(create_ui_icon("uc:play-pause", 1, 2, Size(2, 2), "PLAY_PAUSE"))
+    main.add(create_ui_icon("uc:volume-high", 0, 4, Size(2, 1), "VOLUME_UP"))
+    main.add(create_ui_icon("uc:volume-low", 2, 4, Size(2, 1), "VOLUME_DOWN"))
+    main.add(create_ui_icon("uc:shuffle", 0, 5, Size(2, 1), "SHUFFLE"))
+    main.add(create_ui_icon("uc:repeat", 2, 5, Size(2, 1), "REPEAT"))
     return [main]

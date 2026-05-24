@@ -1,6 +1,7 @@
 """Spotify media browser. :copyright: (c) 2024 by Meir Miyara. :license: MPL-2.0"""
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import TYPE_CHECKING
 
@@ -29,6 +30,8 @@ ROOT_ITEMS = [
     ("top_tracks", "Top Tracks", MediaClass.TRACK),
     ("top_artists", "Top Artists", MediaClass.ARTIST),
     ("followed_artists", "Artists", MediaClass.ARTIST),
+    ("new_releases", "New Releases", MediaClass.ALBUM),
+    ("queue", "Queue", MediaClass.TRACK),
 ]
 
 
@@ -39,7 +42,7 @@ async def browse(client: SpotifyClient, options: BrowseOptions) -> BrowseResults
     media_id = options.media_id if hasattr(options, "media_id") else None
 
     if not media_id or media_id == "root":
-        return _browse_root()
+        return await _browse_root(client)
 
     if media_id == "playlists":
         return await _browse_playlists(client, options)
@@ -61,6 +64,12 @@ async def browse(client: SpotifyClient, options: BrowseOptions) -> BrowseResults
 
     if media_id == "followed_artists":
         return await _browse_followed_artists(client, options)
+
+    if media_id == "new_releases":
+        return await _browse_new_releases(client, options)
+
+    if media_id == "queue":
+        return await _browse_queue(client, options)
 
     if media_id.startswith("playlist_"):
         playlist_id = media_id[9:]
@@ -125,7 +134,9 @@ async def search(client: SpotifyClient, options: SearchOptions) -> SearchResults
     )
 
 
-def _browse_root() -> BrowseResults:
+async def _browse_root(client: SpotifyClient) -> BrowseResults:
+    thumbnails = await _fetch_root_thumbnails(client)
+
     items = []
     for item_id, title, media_class in ROOT_ITEMS:
         items.append(BrowseMediaItem(
@@ -135,7 +146,7 @@ def _browse_root() -> BrowseResults:
             media_id=item_id,
             can_browse=True,
             can_play=False,
-            thumbnail="icon://uc:music",
+            thumbnail=thumbnails.get(item_id),
         ))
 
     return BrowseResults(
@@ -150,6 +161,46 @@ def _browse_root() -> BrowseResults:
         ),
         pagination=Pagination(page=1, limit=len(items), count=len(items)),
     )
+
+
+async def _fetch_root_thumbnails(client: SpotifyClient) -> dict[str, str | None]:
+    async def _first_image(coro, *keys) -> tuple[str, str | None]:
+        try:
+            data = await coro
+            if not data:
+                return keys[0], None
+            obj = data
+            for k in keys[1:]:
+                obj = obj.get(k, {}) if isinstance(obj, dict) else {}
+            items = obj.get("items", []) if isinstance(obj, dict) else obj
+            if isinstance(items, list):
+                for item in items:
+                    track = item.get("track", item) if isinstance(item, dict) else item
+                    if isinstance(track, dict):
+                        images = track.get("images") or track.get("album", {}).get("images", [])
+                        if images:
+                            return keys[0], images[0].get("url")
+        except Exception:
+            pass
+        return keys[0], None
+
+    results = await asyncio.gather(
+        _first_image(client.get_user_playlists(limit=1, offset=0), "playlists"),
+        _first_image(client.get_saved_tracks(limit=1, offset=0), "saved_tracks"),
+        _first_image(client.get_saved_albums(limit=1, offset=0), "saved_albums"),
+        _first_image(client.get_recently_played(limit=1), "recently_played"),
+        _first_image(client.get_top_tracks(limit=1, offset=0), "top_tracks"),
+        _first_image(client.get_top_artists(limit=1, offset=0), "top_artists"),
+        _first_image(client.get_followed_artists(limit=1), "followed_artists", "artists"),
+        _first_image(client.get_new_releases(limit=1, offset=0), "new_releases", "albums"),
+        return_exceptions=True,
+    )
+
+    thumbnails: dict[str, str | None] = {}
+    for result in results:
+        if isinstance(result, tuple):
+            thumbnails[result[0]] = result[1]
+    return thumbnails
 
 
 async def _browse_playlists(client: SpotifyClient, options: BrowseOptions) -> BrowseResults:
@@ -355,6 +406,78 @@ async def _browse_followed_artists(client: SpotifyClient, options: BrowseOptions
             items=items,
         ),
         pagination=Pagination(page=1, limit=len(items), count=total),
+    )
+
+
+async def _browse_new_releases(client: SpotifyClient, options: BrowseOptions) -> BrowseResults:
+    page = _get_page(options)
+    limit = _get_limit(options, default=20)
+    offset = (page - 1) * limit
+
+    data = await client.get_new_releases(limit=limit, offset=offset)
+    if not data:
+        return _empty_browse("new_releases", "New Releases", page, limit)
+
+    items = []
+    for album in data.get("albums", {}).get("items", []):
+        item = _album_to_browse_item(album)
+        if item:
+            items.append(item)
+
+    total = data.get("albums", {}).get("total", 0)
+    return BrowseResults(
+        media=BrowseMediaItem(
+            title="New Releases",
+            media_class=MediaClass.ALBUM,
+            media_type="directory",
+            media_id="new_releases",
+            can_browse=True,
+            items=items,
+        ),
+        pagination=Pagination(page=page, limit=limit, count=total),
+    )
+
+
+async def _browse_queue(client: SpotifyClient, options: BrowseOptions) -> BrowseResults:
+    data = await client.get_queue()
+    if not data:
+        return _empty_browse("queue", "Queue", 1, 50)
+
+    items = []
+    current = data.get("currently_playing")
+    if current and current.get("type") == "track":
+        item = _track_to_browse_item(current)
+        if item:
+            item = BrowseMediaItem(
+                title=f"Now: {item.title}",
+                media_class=item.media_class,
+                media_type=item.media_type,
+                media_id=item.media_id,
+                can_browse=False,
+                can_play=True,
+                thumbnail=item.thumbnail,
+                artist=item.artist,
+                album=item.album,
+                duration=item.duration,
+            )
+            items.append(item)
+
+    for track in data.get("queue", []):
+        if track.get("type") == "track":
+            item = _track_to_browse_item(track)
+            if item:
+                items.append(item)
+
+    return BrowseResults(
+        media=BrowseMediaItem(
+            title="Queue",
+            media_class=MediaClass.TRACK,
+            media_type="directory",
+            media_id="queue",
+            can_browse=True,
+            items=items,
+        ),
+        pagination=Pagination(page=1, limit=len(items), count=len(items)),
     )
 
 
