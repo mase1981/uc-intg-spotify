@@ -106,14 +106,13 @@ services:
     environment:
       - UC_CONFIG_HOME=/data
       - UC_INTEGRATION_HTTP_PORT=9090
-      - UC_INTEGRATION_INTERFACE=0.0.0.0
       - PYTHONPATH=/app
     restart: unless-stopped
 ```
 
 **Docker Run:**
 ```bash
-docker run -d --name=uc-intg-spotify --network host -v </local/path>:/data -e UC_CONFIG_HOME=/data -e UC_INTEGRATION_HTTP_PORT=9090 -e UC_INTEGRATION_INTERFACE=0.0.0.0 -e PYTHONPATH=/app --restart unless-stopped ghcr.io/mase1981/uc-intg-spotify:latest
+docker run -d --name=uc-intg-spotify --network host -v </local/path>:/data -e UC_CONFIG_HOME=/data -e UC_INTEGRATION_HTTP_PORT=9090 -e PYTHONPATH=/app --restart unless-stopped ghcr.io/mase1981/uc-intg-spotify:latest
 ```
 
 ## Prerequisites
