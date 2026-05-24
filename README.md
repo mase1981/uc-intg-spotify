@@ -1,6 +1,6 @@
 # Spotify Integration for Unfolded Circle Remote 2/3
 
-Control Spotify playback and view currently playing track information on your Unfolded Circle Remote 2 or Remote 3 with **real-time updates**, **album artwork**, and **full playback control**.
+Control Spotify playback from your Unfolded Circle Remote with full media browsing, device switching, and real-time updates.
 
 ![Spotify](https://img.shields.io/badge/Spotify-1DB954?style=flat-square&logo=spotify&logoColor=white)
 [![GitHub Release](https://img.shields.io/github/v/release/mase1981/uc-intg-spotify?style=flat-square)](https://github.com/mase1981/uc-intg-spotify/releases)
@@ -13,95 +13,70 @@ Control Spotify playback and view currently playing track information on your Un
 [![PayPal](https://img.shields.io/badge/PayPal-donate-blue.svg?style=flat-square)](https://paypal.me/mmiyara)
 [![Github Sponsors](https://img.shields.io/badge/GitHub%20Sponsors-30363D?&logo=GitHub-Sponsors&logoColor=EA4AAA&style=flat-square)](https://github.com/sponsors/mase1981)
 
+## Requirements
+
+- **Spotify Premium** account (API no longer supports Free accounts)
+- Spotify Developer App (free, 5-minute setup)
 
 ## Features
 
-This integration provides comprehensive Spotify control directly from your Unfolded Circle Remote.
+### Entities
 
-**IMPORTANT:** Requires a **Spotify Premium** account and creating your own Spotify Developer App (free to create, 5 minutes). Full setup instructions below.
+| Entity | Description |
+|--------|-------------|
+| **Media Player** | Full playback control with artwork, progress, browse, and search |
+| **Remote** | Physical button mappings and custom UI |
+| **Device Select** | Switch between Spotify Connect devices |
+| **Now Playing Sensor** | Current track info as text |
+| **Active Device Sensor** | Currently active playback device |
 
-> **Note:** As of February 2026, Spotify API no longer supports Free accounts. Only Premium subscribers can use this integration.
+### Playback Control
 
----
+- Play/pause, next, previous, seek
+- Volume control (precise 1% steps)
+- Shuffle and repeat toggle
+- Album artwork and live progress
 
-## ❤️ Support Development ❤️
+### Media Browsing & Search
 
-If you find this integration useful, consider supporting development:
+- Browse your playlists, saved albums, liked songs
+- Browse top tracks, top artists, followed artists
+- Browse recently played, new releases
+- Full-text search across tracks, albums, artists, and playlists
+- Play any item directly from browse/search results
 
-[![GitHub Sponsors](https://img.shields.io/badge/Sponsor-GitHub-pink?style=for-the-badge&logo=github)](https://github.com/sponsors/mase1981)
-[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/meirmiyara)
-[![PayPal](https://img.shields.io/badge/PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://paypal.me/mmiyara)
+### Spotify Connect Device Switching
 
-Your support helps maintain this integration. Thank you! ❤️
-
----
-
-### 🎵 **Features**
-
-- **Real-time Track Display** - Title, artist, album with artwork
-- **Playback Progress** - Live position and duration tracking
-- **Album Artwork** - High-quality cover art display
-- **State Updates** - Every 30 seconds (configurable)
-- **Play/Pause Control** - Toggle playback
-- **Track Navigation** - Next/previous track
-- **Volume Control** - Set volume or use up/down
-- **Physical Button Mapping** - UC Remote hardware buttons
-- **Remote Entity** - Custom UI with playback controls
-
-### **Protocol Requirements**
-
-- **Protocol**: Spotify Web API
-- **Authentication**: OAuth 2.0 Authorization Code Flow
-- **Token Management**: Automatic refresh
-- **Internet Required**: Cloud-based integration
-- **Polling**: 30-second intervals (configurable)
-
-### **Network Requirements**
-
-- **Internet Connection** - Required for Spotify API access
-- **HTTPS Access** - Outbound HTTPS traffic
-- **Bandwidth** - Minimal (artwork + metadata)
-- **Developer App** - Spotify Developer App (free to create)
+- Switch playback between all your Spotify Connect devices
+- **Zeroconf/mDNS discovery** finds devices on your local network (even when idle)
+- **Device caching** keeps recently-seen devices available for 24 hours
+- **Smart name resolution** queries devices directly for their real friendly names
+- Devices from three sources: Spotify API + Zeroconf + Cache
 
 ## Prerequisites
 
 ### Spotify Developer App Setup
 
-**BEFORE INSTALLATION:** You must create a Spotify Developer App to get your Client ID and Client Secret.
-
 1. Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
 2. Log in with your **Premium** Spotify account
 3. Click **"Create App"**
-4. Fill in the details:
-   - **App Name**: `UC Remote Integration` (or any name)
-   - **App Description**: `Unfolded Circle Remote integration`
-   - **Redirect URI**: `https://example.com/callback` ⚠️ **Must be exactly this**
+4. Fill in:
+   - **App Name**: `UC Remote` (or any name)
+   - **Redirect URI**: `https://example.com/callback` (must be exact)
    - **API**: Check **"Web API"**
 5. Click **"Save"**
-6. Note your **Client ID** and **Client Secret** (click "Show Client Secret")
-
-#### Important Notes:
-- ✅ **Spotify Premium required** - API no longer supports Free accounts
-- ✅ Keep credentials secure - don't share them
-- ✅ Redirect URI must be **exactly** `https://example.com/callback`
-- ✅ No recurring costs - one-time setup
+6. Note your **Client ID** and **Client Secret**
 
 ## Installation
 
 ### Option 1: Remote Web Interface (Recommended)
-1. Navigate to the [**Releases**](https://github.com/mase1981/uc-intg-spotify/releases) page
-2. Download the latest `uc-intg-spotify-<version>-aarch64.tar.gz` file
-3. Open your remote's web interface (`http://your-remote-ip`)
-4. Go to **Settings** → **Integrations** → **Add Integration**
-5. Click **Upload** and select the downloaded `.tar.gz` file
 
-### Option 2: Docker (Advanced Users)
+1. Download the latest `.tar.gz` from [Releases](https://github.com/mase1981/uc-intg-spotify/releases)
+2. Open your remote's web interface (`http://your-remote-ip`)
+3. Go to **Settings** → **Integrations** → **Add Integration** → **Upload**
 
-The integration is available as a pre-built Docker image from GitHub Container Registry:
+### Option 2: Docker
 
-**Image**: `ghcr.io/mase1981/uc-intg-spotify:latest`
-
-**Docker Compose:**
 ```yaml
 services:
   uc-intg-spotify:
@@ -112,126 +87,28 @@ services:
       - </local/path>:/data
     environment:
       - UC_CONFIG_HOME=/data
-      - UC_INTEGRATION_HTTP_PORT=9090
       - UC_INTEGRATION_INTERFACE=0.0.0.0
-      - PYTHONPATH=/app
     restart: unless-stopped
-```
-
-**Docker Run:**
-```bash
-docker run -d --name uc-spotify --restart unless-stopped --network host -v spotify-config:/app/config -e UC_CONFIG_HOME=/app/config -e UC_INTEGRATION_INTERFACE=0.0.0.0 -e UC_INTEGRATION_HTTP_PORT=9090 -e PYTHONPATH=/app ghcr.io/mase1981/uc-intg-spotify:latest
-```
-
-### Local Release Build
-
-To build the same uploadable archive locally, run:
-
-```bash
-./scripts/build-local.sh
-```
-
-The script uses Docker and the same `unfoldedcircle/r2-pyinstaller` builder image as the GitHub Actions workflow. It creates `uc-intg-spotify-<version>-aarch64.tar.gz` in the project root. The version defaults to `driver.json`, or you can override it like so:
-
-```bash
-./scripts/build-local.sh 1.0.7
 ```
 
 ## Configuration
 
-### Step 1: Enter App Credentials
+1. After installation, go to **Settings** → **Integrations** → **Spotify** → **Configure**
+2. Enter your **Client ID** and **Client Secret**
+3. Click the authorization URL, log in, and approve
+4. Copy the `code=...` value from the redirect URL (or paste the entire URL)
+5. Done — all entities are created automatically
 
-1. After installation, go to **Settings** → **Integrations** → Spotify
-2. Click **"Configure"**
-3. Enter your **Spotify Client ID**
-4. Enter your **Spotify Client Secret**
-5. Click **Next**
+## Support Development
 
-### Step 2: Authentication
-
-1. **Click the Spotify authorization URL** (opens in browser)
-2. Log into your Spotify account
-3. Click **Agree** to authorize
-4. Browser shows "page not found" - **this is normal!**
-5. **Copy the authorization code** from browser address bar:
-   - Look for `code=...` in the URL
-   - Copy everything after `code=` (long string ~100+ characters)
-   - Or paste the entire callback URL
-6. **Paste code** into setup form
-7. Click **Finish**
-
-### Step 3: Completion
-
-Two entities are created:
-- **Spotify Player** (Media Player entity)
-- **Spotify Remote** (Remote entity with controls)
-
-## Using the Integration
-
-### Media Player Entity
-
-- Currently playing track information
-- Album artwork
-- Real-time playback progress
-- Track duration and position
-- Play/pause button
-- Next/previous track buttons
-- Volume control slider
-- Volume up/down buttons
-
-### Remote Entity
-
-- Physical button mappings:
-  - **Play** → Play/Pause
-  - **Next** → Next Track
-  - **Prev** → Previous Track
-  - **Volume Up** → Increase Volume
-  - **Volume Down** → Decrease Volume
-- Custom UI with playback controls
-- Synchronized state with Spotify
-
-## Credits
-
-- **Developer**: Meir Miyara
-- **Spotify**: Music streaming platform
-- **Unfolded Circle**: Remote 2/3 integration framework (ucapi)
-- **Protocol**: Spotify Web API with OAuth 2.0
-- **Community**: Testing and feedback from UC community
+[![GitHub Sponsors](https://img.shields.io/badge/Sponsor-GitHub-pink?style=for-the-badge&logo=github)](https://github.com/sponsors/mase1981)
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/meirmiyara)
+[![PayPal](https://img.shields.io/badge/PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://paypal.me/mmiyara)
 
 ## License
 
-This project is licensed under the Mozilla Public License 2.0 (MPL-2.0) - see LICENSE file for details.
+Mozilla Public License 2.0 (MPL-2.0)
 
-## Legal Disclaimers
+## Disclaimer
 
-### Third-Party Service Integration
-
-This integration is an **independent, unofficial project** that interfaces with Spotify's publicly available Web API:
-
-- ❌ **NOT** sponsored, endorsed, or affiliated with Spotify AB
-- ❌ **NOT** an official Spotify product or service
-- ✅ Developed independently using Spotify's public API
-- ✅ Open source under MPL-2.0 license
-
-### Terms of Service
-
-By using this integration, you agree to:
-
-- ✅ Comply with [Spotify Developer Terms](https://developer.spotify.com/terms)
-- ✅ Comply with [Spotify Web API Terms](https://developer.spotify.com/terms)
-- ✅ Create and manage your own Spotify Developer App
-- ✅ Accept responsibility for your API usage
-- ✅ Use at your own risk
-
-## Support & Community
-
-- **GitHub Issues**: [Report bugs and request features](https://github.com/mase1981/uc-intg-spotify/issues)
-- **UC Community Forum**: [General discussion and support](https://unfolded.community/)
-- **Developer**: [Meir Miyara](https://www.linkedin.com/in/meirmiyara)
-- **Spotify Support**: [Official Spotify Support](https://support.spotify.com/)
-
----
-
-**Made with ❤️ for the Unfolded Circle and Spotify Communities**
-
-**Thank You**: Meir Miyara
+This is an independent, unofficial project using Spotify's public Web API. Not affiliated with or endorsed by Spotify AB.

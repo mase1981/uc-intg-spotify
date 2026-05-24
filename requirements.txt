@@ -2,3 +2,4 @@ ucapi>=0.7.0
 ucapi-framework>=1.9.5
 aiohttp>=3.9.0
 certifi>=2023.0.0
+zeroconf>=0.131.0

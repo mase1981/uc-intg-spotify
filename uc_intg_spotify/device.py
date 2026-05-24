@@ -10,10 +10,13 @@ from ucapi_framework import DeviceEvents, PollingDevice
 
 from uc_intg_spotify.client import SpotifyClient
 from uc_intg_spotify.config import SpotifyDeviceConfig
+from uc_intg_spotify.discovery import SpotifyDiscovery, resolve_device_names, _is_junk_name
 
 _LOG = logging.getLogger(__name__)
 
 _HEX_HASH_RE = re.compile(r"^[0-9a-f]{32,}$", re.IGNORECASE)
+
+DEVICE_CACHE_TTL = 86400  # 24 hours
 
 _DEVICE_TYPE_LABELS = {
     "Computer": "Computer",
@@ -33,6 +36,9 @@ _DEVICE_TYPE_LABELS = {
 
 def device_display_name(dev: dict[str, Any]) -> str:
     """Build a user-friendly display name for a Spotify Connect device."""
+    override = dev.get("_display_name", "")
+    if override:
+        return override
     name = dev.get("name", "")
     if name and not _HEX_HASH_RE.match(name):
         return name
@@ -72,6 +78,9 @@ class SpotifyDevice(PollingDevice):
         self._devices: list[dict[str, Any]] = []
         self._disallows: dict[str, bool] = {}
 
+        self._device_cache: dict[str, dict[str, Any]] = {}
+        self._discovery = SpotifyDiscovery(on_update=self._on_zeroconf_update)
+
     @property
     def identifier(self) -> str:
         return self._device_config.identifier
@@ -96,6 +105,13 @@ class SpotifyDevice(PollingDevice):
         for dev in self._devices:
             if device_display_name(dev) == name:
                 return dev.get("id", "")
+        for cached in self._device_cache.values():
+            dev = cached["device"]
+            if device_display_name(dev) == name:
+                return dev.get("id", "")
+        for zc_dev in self._discovery.devices.values():
+            if zc_dev.get("name") == name:
+                return zc_dev.get("device_id", "")
         return None
 
     def get_first_available_device_id(self) -> str | None:
@@ -115,6 +131,7 @@ class SpotifyDevice(PollingDevice):
                 raise ConnectionError("Failed to refresh Spotify access token")
             self._persist_tokens(token_data)
 
+        self._discovery.start()
         self._state = "ON"
         _LOG.info("[%s] Connected to Spotify", self.log_id)
 
@@ -183,7 +200,10 @@ class SpotifyDevice(PollingDevice):
                 self._disallows = {}
 
             self._devices = devices
-            self._source_list = [device_display_name(d) for d in devices if d.get("id")]
+            self._update_device_cache(devices)
+            await resolve_device_names(self._discovery)
+            self._enrich_api_device_names()
+            self._source_list = self._build_source_list(devices)
 
             self.push_update()
 
@@ -194,11 +214,75 @@ class SpotifyDevice(PollingDevice):
                 self.events.emit(DeviceEvents.DISCONNECTED, self.identifier)
 
     async def disconnect(self) -> None:
+        self._discovery.stop()
         if self._client:
             await self._client.close()
             self._client = None
         self._state = "UNAVAILABLE"
         await super().disconnect()
+
+    def _update_device_cache(self, api_devices: list[dict[str, Any]]) -> None:
+        now = time.time()
+        for dev in api_devices:
+            dev_id = dev.get("id", "")
+            if dev_id:
+                self._device_cache[dev_id] = {
+                    "device": dev,
+                    "last_seen": now,
+                }
+
+        expired = [k for k, v in self._device_cache.items() if now - v["last_seen"] > DEVICE_CACHE_TTL]
+        for k in expired:
+            del self._device_cache[k]
+
+    def _build_source_list(self, api_devices: list[dict[str, Any]]) -> list[str]:
+        seen_names: set[str] = set()
+        result: list[str] = []
+
+        for dev in api_devices:
+            if dev.get("id"):
+                name = device_display_name(dev)
+                if name not in seen_names:
+                    seen_names.add(name)
+                    result.append(name)
+
+        zeroconf_devices = self._discovery.devices
+        for zc_dev in zeroconf_devices.values():
+            name = zc_dev.get("name", "")
+            if name and not _is_junk_name(name) and name not in seen_names:
+                seen_names.add(name)
+                result.append(name)
+
+        for cached in self._device_cache.values():
+            dev = cached["device"]
+            name = device_display_name(dev)
+            if name not in seen_names:
+                seen_names.add(name)
+                result.append(name)
+
+        return result
+
+    def _enrich_api_device_names(self) -> None:
+        """Use Zeroconf-resolved names to fix API devices with hex hash names."""
+        zc_by_id: dict[str, str] = {}
+        for zc_dev in self._discovery.devices.values():
+            device_id = zc_dev.get("device_id", "")
+            name = zc_dev.get("name", "")
+            if device_id and name:
+                zc_by_id[device_id] = name
+
+        for dev in self._devices:
+            api_name = dev.get("name", "")
+            api_id = dev.get("id", "")
+            if api_id and api_name and _HEX_HASH_RE.match(api_name):
+                resolved_name = zc_by_id.get(api_id, "")
+                if resolved_name:
+                    dev["_display_name"] = resolved_name
+
+    def _on_zeroconf_update(self) -> None:
+        if self._state != "UNAVAILABLE":
+            self._source_list = self._build_source_list(self._devices)
+            self.push_update()
 
     def _is_token_expired(self) -> bool:
         return int(time.time()) >= self._device_config.token_expires_at
