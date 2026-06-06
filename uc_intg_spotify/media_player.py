@@ -29,6 +29,15 @@ def _command(name: str, fallback: str) -> str:
     return getattr(media_player.Commands, name, fallback)
 
 
+def _shuffle_from_params(params: dict[str, Any] | None, default: bool) -> bool:
+    if not params or "shuffle" not in params:
+        return default
+    value = params["shuffle"]
+    if isinstance(value, str):
+        return value.lower() in ("1", "true", "yes", "on")
+    return bool(value)
+
+
 class SpotifyMediaPlayer(MediaPlayerEntity):
     """Media player entity for Spotify."""
 
@@ -215,7 +224,11 @@ class SpotifyMediaPlayer(MediaPlayerEntity):
             return StatusCodes.OK if ok else StatusCodes.SERVER_ERROR
 
         if cmd_id == media_player.Commands.SHUFFLE:
-            ok = await client.set_shuffle(not self._device._shuffle)
+            shuffle = _shuffle_from_params(params, not self._device._shuffle)
+            ok = await client.set_shuffle(shuffle)
+            if ok:
+                self._device.set_shuffle_state(shuffle)
+                self._device.schedule_playback_refresh()
             return StatusCodes.OK if ok else StatusCodes.SERVER_ERROR
 
         if cmd_id == media_player.Commands.REPEAT:

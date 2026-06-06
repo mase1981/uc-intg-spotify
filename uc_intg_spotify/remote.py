@@ -132,7 +132,11 @@ class SpotifyRemote(RemoteEntity):
             if ok:
                 self._device.set_volume_state(volume)
         elif command == "SHUFFLE":
-            ok = await client.set_shuffle(not self._device._shuffle)
+            shuffle = not self._device._shuffle
+            ok = await client.set_shuffle(shuffle)
+            if ok:
+                self._device.set_shuffle_state(shuffle)
+                self._device.schedule_playback_refresh()
         elif command == "REPEAT":
             cycle = {"off": "context", "context": "track", "track": "off"}
             ok = await client.set_repeat(cycle.get(self._device._repeat, "off"))
