@@ -1,6 +1,8 @@
 """Spotify polling device. :copyright: (c) 2024 by Meir Miyara. :license: MPL-2.0"""
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import logging
 import re
 import time
@@ -17,6 +19,7 @@ _LOG = logging.getLogger(__name__)
 _HEX_HASH_RE = re.compile(r"^[0-9a-f]{32,}$", re.IGNORECASE)
 
 DEVICE_CACHE_TTL = 86400  # 24 hours
+PLAYBACK_REFRESH_DELAY = 0.5
 
 _DEVICE_TYPE_LABELS = {
     "Computer": "Computer",
@@ -80,6 +83,7 @@ class SpotifyDevice(PollingDevice):
 
         self._device_cache: dict[str, dict[str, Any]] = {}
         self._discovery = SpotifyDiscovery(on_update=self._on_zeroconf_update)
+        self._playback_refresh_task: asyncio.Task[None] | None = None
 
     @property
     def identifier(self) -> str:
@@ -118,6 +122,30 @@ class SpotifyDevice(PollingDevice):
         if self._devices:
             return self._devices[0].get("id")
         return None
+
+    def set_playing_state(self, is_playing: bool) -> None:
+        """Optimistically update playback state after Spotify accepts a command."""
+        self._is_playing = is_playing
+        if is_playing:
+            self._state = "PLAYING"
+        else:
+            self._state = "PAUSED" if self._title else "ON"
+        self.push_update()
+
+    def schedule_playback_refresh(self) -> None:
+        """Debounce playback refreshes after Spotify playback commands."""
+        if self._playback_refresh_task:
+            self._playback_refresh_task.cancel()
+        self._playback_refresh_task = asyncio.create_task(self._refresh_playback_after_delay())
+
+    async def _refresh_playback_after_delay(self) -> None:
+        try:
+            await asyncio.sleep(PLAYBACK_REFRESH_DELAY)
+            await self.poll_device()
+        except asyncio.CancelledError:
+            raise
+        except Exception as err:
+            _LOG.debug("[%s] Playback refresh failed: %s", self.log_id, err)
 
     async def establish_connection(self) -> None:
         cfg = self._device_config
@@ -214,6 +242,11 @@ class SpotifyDevice(PollingDevice):
                 self.events.emit(DeviceEvents.DISCONNECTED, self.identifier)
 
     async def disconnect(self) -> None:
+        if self._playback_refresh_task:
+            self._playback_refresh_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._playback_refresh_task
+            self._playback_refresh_task = None
         self._discovery.stop()
         if self._client:
             await self._client.close()

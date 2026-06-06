@@ -124,22 +124,34 @@ class SpotifyMediaPlayer(MediaPlayerEntity):
 
         if cmd_id == media_player.Commands.OFF:
             ok = await client.pause()
+            if ok:
+                self._device.set_playing_state(False)
+                self._device.schedule_playback_refresh()
             return StatusCodes.OK if ok else StatusCodes.SERVER_ERROR
 
         if cmd_id == media_player.Commands.PLAY_PAUSE:
             if self._device._is_playing:
                 ok = await client.pause()
+                is_playing = False
             else:
-                device_id = self._device.get_first_available_device_id() if not self._device._is_playing else None
+                device_id = self._device.get_first_available_device_id()
                 ok = await client.play(device_id)
+                is_playing = True
+            if ok:
+                self._device.set_playing_state(is_playing)
+                self._device.schedule_playback_refresh()
             return StatusCodes.OK if ok else StatusCodes.SERVER_ERROR
 
         if cmd_id == media_player.Commands.NEXT:
             ok = await client.next_track()
+            if ok:
+                self._device.schedule_playback_refresh()
             return StatusCodes.OK if ok else StatusCodes.SERVER_ERROR
 
         if cmd_id == media_player.Commands.PREVIOUS:
             ok = await client.previous_track()
+            if ok:
+                self._device.schedule_playback_refresh()
             return StatusCodes.OK if ok else StatusCodes.SERVER_ERROR
 
         if cmd_id == media_player.Commands.VOLUME:

@@ -83,18 +83,33 @@ class SpotifyRemote(RemoteEntity):
         if command == "PLAY_PAUSE":
             if self._device._is_playing:
                 ok = await client.pause()
+                is_playing = False
             else:
                 device_id = self._device.get_first_available_device_id()
                 ok = await client.play(device_id)
+                is_playing = True
+            if ok:
+                self._device.set_playing_state(is_playing)
+                self._device.schedule_playback_refresh()
         elif command == "PLAY":
             device_id = self._device.get_first_available_device_id() if not self._device._is_playing else None
             ok = await client.play(device_id)
+            if ok:
+                self._device.set_playing_state(True)
+                self._device.schedule_playback_refresh()
         elif command == "PAUSE":
             ok = await client.pause()
+            if ok:
+                self._device.set_playing_state(False)
+                self._device.schedule_playback_refresh()
         elif command == "NEXT":
             ok = await client.next_track()
+            if ok:
+                self._device.schedule_playback_refresh()
         elif command == "PREVIOUS":
             ok = await client.previous_track()
+            if ok:
+                self._device.schedule_playback_refresh()
         elif command == "VOLUME_UP":
             new_vol = min(100, self._device._volume + 1)
             ok = await client.set_volume(new_vol)
