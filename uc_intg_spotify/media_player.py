@@ -38,6 +38,29 @@ def _shuffle_from_params(params: dict[str, Any] | None, default: bool) -> bool:
     return bool(value)
 
 
+def _repeat_from_params(params: dict[str, Any] | None, default: str) -> str:
+    if not params:
+        return default
+
+    value = params.get("repeat")
+    if value is None:
+        value = params.get("repeat_mode")
+    if value is None:
+        return default
+
+    repeat = str(getattr(value, "value", value)).lower()
+    mapping = {
+        "off": "off",
+        "false": "off",
+        "none": "off",
+        "all": "context",
+        "context": "context",
+        "one": "track",
+        "track": "track",
+    }
+    return mapping.get(repeat, default)
+
+
 class SpotifyMediaPlayer(MediaPlayerEntity):
     """Media player entity for Spotify."""
 
@@ -233,8 +256,11 @@ class SpotifyMediaPlayer(MediaPlayerEntity):
 
         if cmd_id == media_player.Commands.REPEAT:
             cycle = {"off": "context", "context": "track", "track": "off"}
-            new_state = cycle.get(self._device._repeat, "off")
+            new_state = _repeat_from_params(params, cycle.get(self._device._repeat, "off"))
             ok = await client.set_repeat(new_state)
+            if ok:
+                self._device.set_repeat_state(new_state)
+                self._device.schedule_playback_refresh()
             return StatusCodes.OK if ok else StatusCodes.SERVER_ERROR
 
         if cmd_id == media_player.Commands.SELECT_SOURCE:

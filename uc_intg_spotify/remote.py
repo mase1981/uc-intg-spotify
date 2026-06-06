@@ -139,7 +139,11 @@ class SpotifyRemote(RemoteEntity):
                 self._device.schedule_playback_refresh()
         elif command == "REPEAT":
             cycle = {"off": "context", "context": "track", "track": "off"}
-            ok = await client.set_repeat(cycle.get(self._device._repeat, "off"))
+            repeat = cycle.get(self._device._repeat, "off")
+            ok = await client.set_repeat(repeat)
+            if ok:
+                self._device.set_repeat_state(repeat)
+                self._device.schedule_playback_refresh()
         else:
             _LOG.warning("Unknown remote command: %s", command)
             return StatusCodes.NOT_IMPLEMENTED

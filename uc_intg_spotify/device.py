@@ -152,6 +152,11 @@ class SpotifyDevice(PollingDevice):
         self._smart_shuffle = False if not shuffle else self._smart_shuffle
         self.push_update()
 
+    def set_repeat_state(self, repeat: str) -> None:
+        """Optimistically update repeat state after Spotify accepts a command."""
+        self._repeat = repeat if repeat in ("off", "context", "track") else "off"
+        self.push_update()
+
     def schedule_playback_refresh(self) -> None:
         """Debounce playback refreshes after Spotify playback commands."""
         if self._playback_refresh_task:
