@@ -20,6 +20,8 @@ _HEX_HASH_RE = re.compile(r"^[0-9a-f]{32,}$", re.IGNORECASE)
 
 DEVICE_CACHE_TTL = 86400  # 24 hours
 PLAYBACK_REFRESH_DELAY = 0.5
+TRACK_FAST_POLL_INTERVAL = 1
+TRACK_FAST_POLL_WINDOW_MS = 10_000
 
 _DEVICE_TYPE_LABELS = {
     "Computer": "Computer",
@@ -87,6 +89,7 @@ class SpotifyDevice(PollingDevice):
         self._device_cache: dict[str, dict[str, Any]] = {}
         self._discovery = SpotifyDiscovery(on_update=self._on_zeroconf_update)
         self._playback_refresh_task: asyncio.Task[None] | None = None
+        self._track_fast_poll_task: asyncio.Task[None] | None = None
 
     @property
     def identifier(self) -> str:
@@ -196,72 +199,7 @@ class SpotifyDevice(PollingDevice):
             playback = await self._client.get_playback_state()
             devices = await self._client.get_available_devices()
 
-            if playback and playback.get("title"):
-                self._is_playing = playback.get("is_playing", False)
-                self._title = playback.get("title", "")
-                self._artist = ", ".join(playback.get("artists", []))
-                self._album = playback.get("album", "")
-                self._image_url = playback.get("image_url", "")
-                self._duration = playback.get("duration_ms", 0) // 1000
-                self._position = playback.get("progress_ms", 0) // 1000
-                self._volume = playback.get("volume_percent", 0)
-                self._muted = self._volume == 0
-                if self._volume > 0:
-                    self._last_nonzero_volume = self._volume
-                self._smart_shuffle = playback.get("smart_shuffle", False)
-                self._shuffle = playback.get("shuffle_state", False) or self._smart_shuffle
-                self._repeat = playback.get("repeat_state", "off")
-                self._media_uri = playback.get("uri", "")
-                self._media_type = playback.get("currently_playing_type", "track")
-                self._disallows = playback.get("disallows", {})
-                self._state = "PLAYING" if self._is_playing else "PAUSED"
-
-                ctx = playback.get("context")
-                if ctx:
-                    self._context_uri = ctx.get("uri", "")
-                    self._context_type = ctx.get("type", "")
-                else:
-                    self._context_uri = ""
-                    self._context_type = ""
-
-                active_id = playback.get("device_id", "")
-                active_dev = next((d for d in devices if d.get("id") == active_id), None)
-                if active_dev:
-                    self._source_name = device_display_name(active_dev)
-                else:
-                    self._source_name = playback.get("device_name", "")
-            elif playback:
-                self._state = "ON"
-                self._is_playing = False
-                self._title = ""
-                self._artist = ""
-                self._album = ""
-                self._image_url = ""
-                self._duration = 0
-                self._position = 0
-                self._media_uri = ""
-                self._volume = playback.get("volume_percent", 0)
-                self._muted = self._volume == 0
-                if self._volume > 0:
-                    self._last_nonzero_volume = self._volume
-                self._smart_shuffle = playback.get("smart_shuffle", False)
-                self._shuffle = playback.get("shuffle_state", False) or self._smart_shuffle
-                self._repeat = playback.get("repeat_state", "off")
-                self._disallows = playback.get("disallows", {})
-            else:
-                self._state = "ON"
-                self._is_playing = False
-                self._title = ""
-                self._artist = ""
-                self._album = ""
-                self._image_url = ""
-                self._duration = 0
-                self._position = 0
-                self._media_uri = ""
-                self._muted = self._volume == 0
-                self._smart_shuffle = False
-                self._shuffle = False
-                self._disallows = {}
+            self._apply_playback_state(playback, devices)
 
             self._devices = devices
             self._update_device_cache(devices)
@@ -270,6 +208,7 @@ class SpotifyDevice(PollingDevice):
             self._source_list = self._build_source_list(devices)
 
             self.push_update()
+            self._ensure_track_fast_poll()
 
         except Exception as err:
             _LOG.debug("[%s] Poll error: %s", self.log_id, err)
@@ -278,6 +217,11 @@ class SpotifyDevice(PollingDevice):
                 self.events.emit(DeviceEvents.DISCONNECTED, self.identifier)
 
     async def disconnect(self) -> None:
+        if self._track_fast_poll_task:
+            self._track_fast_poll_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._track_fast_poll_task
+            self._track_fast_poll_task = None
         if self._playback_refresh_task:
             self._playback_refresh_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
@@ -289,6 +233,128 @@ class SpotifyDevice(PollingDevice):
             self._client = None
         self._state = "UNAVAILABLE"
         await super().disconnect()
+
+    def _apply_playback_state(
+        self, playback: dict[str, Any] | None, devices: list[dict[str, Any]] | None = None
+    ) -> None:
+        devices = devices if devices is not None else self._devices
+
+        if playback and playback.get("title"):
+            self._is_playing = playback.get("is_playing", False)
+            self._title = playback.get("title", "")
+            self._artist = ", ".join(playback.get("artists", []))
+            self._album = playback.get("album", "")
+            self._image_url = playback.get("image_url", "")
+            self._duration = playback.get("duration_ms", 0) // 1000
+            self._position = playback.get("progress_ms", 0) // 1000
+            self._volume = playback.get("volume_percent", 0)
+            self._muted = self._volume == 0
+            if self._volume > 0:
+                self._last_nonzero_volume = self._volume
+            self._smart_shuffle = playback.get("smart_shuffle", False)
+            self._shuffle = playback.get("shuffle_state", False) or self._smart_shuffle
+            self._repeat = playback.get("repeat_state", "off")
+            self._media_uri = playback.get("uri", "")
+            self._media_type = playback.get("currently_playing_type", "track")
+            self._disallows = playback.get("disallows", {})
+            self._state = "PLAYING" if self._is_playing else "PAUSED"
+
+            ctx = playback.get("context")
+            if ctx:
+                self._context_uri = ctx.get("uri", "")
+                self._context_type = ctx.get("type", "")
+            else:
+                self._context_uri = ""
+                self._context_type = ""
+
+            active_id = playback.get("device_id", "")
+            active_dev = next((d for d in devices if d.get("id") == active_id), None)
+            if active_dev:
+                self._source_name = device_display_name(active_dev)
+            else:
+                self._source_name = playback.get("device_name", "")
+            return
+
+        if playback:
+            self._state = "ON"
+            self._is_playing = False
+            self._title = ""
+            self._artist = ""
+            self._album = ""
+            self._image_url = ""
+            self._duration = 0
+            self._position = 0
+            self._media_uri = ""
+            self._volume = playback.get("volume_percent", 0)
+            self._muted = self._volume == 0
+            if self._volume > 0:
+                self._last_nonzero_volume = self._volume
+            self._smart_shuffle = playback.get("smart_shuffle", False)
+            self._shuffle = playback.get("shuffle_state", False) or self._smart_shuffle
+            self._repeat = playback.get("repeat_state", "off")
+            self._disallows = playback.get("disallows", {})
+            return
+
+        self._state = "ON"
+        self._is_playing = False
+        self._title = ""
+        self._artist = ""
+        self._album = ""
+        self._image_url = ""
+        self._duration = 0
+        self._position = 0
+        self._media_uri = ""
+        self._muted = self._volume == 0
+        self._smart_shuffle = False
+        self._shuffle = False
+        self._disallows = {}
+
+    def _display_snapshot(self) -> tuple[Any, ...]:
+        return (
+            self._state,
+            self._is_playing,
+            self._title,
+            self._artist,
+            self._album,
+            self._image_url,
+            self._duration,
+            self._volume,
+            self._muted,
+            self._shuffle,
+            self._repeat,
+            self._media_uri,
+            self._media_type,
+            self._context_uri,
+            self._context_type,
+        )
+
+    def _ensure_track_fast_poll(self) -> None:
+        if not self._should_fast_poll_track():
+            return
+        if self._track_fast_poll_task and not self._track_fast_poll_task.done():
+            return
+        self._track_fast_poll_task = asyncio.create_task(self._fast_poll_current_track())
+
+    def _should_fast_poll_track(self) -> bool:
+        return bool(self._client and self._is_playing and self._media_uri and self._position < 10)
+
+    async def _fast_poll_current_track(self) -> None:
+        try:
+            while self._should_fast_poll_track():
+                await asyncio.sleep(TRACK_FAST_POLL_INTERVAL)
+                if not self._client:
+                    return
+
+                before = self._display_snapshot()
+                playback = await self._client.get_playback_state()
+                self._apply_playback_state(playback)
+
+                if self._display_snapshot() != before:
+                    self.push_update()
+        except asyncio.CancelledError:
+            raise
+        except Exception as err:
+            _LOG.debug("[%s] Fast track poll failed: %s", self.log_id, err)
 
     def _update_device_cache(self, api_devices: list[dict[str, Any]]) -> None:
         now = time.time()
