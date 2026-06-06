@@ -40,6 +40,14 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "DRIVER_ID=$DRIVER_BASE" >> $GITHUB_OUTPUT
 
+      - name: Prepare driver metadata
+        run: |
+          mkdir -p build_metadata
+          jq --arg version "${VERSION}" --arg release_date "$(date -u +%F)" \
+            '.version = $version | .release_date = $release_date' \
+            driver.json > build_metadata/driver.json
+          cat build_metadata/driver.json
+
       - name: Build
         run: |
           sudo apt-get update && sudo apt-get install -y qemu-system-arm binfmt-support qemu-user-static
@@ -53,7 +61,7 @@ jobs:
             "cd /workspace && \
               python -m pip install -r requirements.txt && \
               pyinstaller --clean --onedir --name driver \
-                --add-data driver.json:. \
+                --add-data build_metadata/driver.json:. \
                 --collect-all zeroconf \
                 --collect-all ucapi \
                 --collect-all ucapi_framework \
@@ -69,13 +77,13 @@ jobs:
                 --hidden-import uc_intg_${INTG_NAME}.sensor \
                 --hidden-import uc_intg_${INTG_NAME}.discovery \
                 --paths . \
-                uc_intg_${INTG_NAME}/__init__.py"
+                uc_intg_${INTG_NAME}/__main__.py"
 
       - name: Prepare artifacts
         run: |
           mkdir -p artifacts/bin
           mv dist/driver/* artifacts/bin/
-          cp driver.json artifacts/
+          cp build_metadata/driver.json artifacts/driver.json
           echo "ARTIFACT_NAME=uc-intg-${{ env.DRIVER_ID }}-${{ env.VERSION }}-aarch64" >> $GITHUB_ENV
           
       - name: Create upload artifact archive

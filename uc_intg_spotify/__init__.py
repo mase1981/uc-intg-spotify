@@ -3,6 +3,7 @@ import asyncio
 import json
 import logging
 import os
+import sys
 from pathlib import Path
 
 from ucapi import DeviceStates
@@ -12,8 +13,22 @@ from uc_intg_spotify.config import SpotifyDeviceConfig
 from uc_intg_spotify.driver import SpotifyDriver
 from uc_intg_spotify.setup import SpotifySetupFlow
 
+
+def _driver_json_path() -> Path:
+    candidates = [
+        Path(getattr(sys, "_MEIPASS", "")) / "driver.json",
+        Path(__file__).resolve().parent.parent / "driver.json",
+        Path.cwd() / "driver.json",
+        Path.cwd() / "bin" / "driver.json",
+    ]
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return candidates[1]
+
+
 try:
-    driver_path = Path(__file__).parent.parent / "driver.json"
+    driver_path = _driver_json_path()
     with open(driver_path, "r", encoding="utf-8") as f:
         __version__ = json.load(f).get("version", "0.0.0")
 except (FileNotFoundError, json.JSONDecodeError):
@@ -43,8 +58,7 @@ async def main() -> None:
     driver.config_manager = config_manager
 
     setup_handler = SpotifySetupFlow.create_handler(driver)
-    driver_json_path = os.path.join(os.path.dirname(__file__), "..", "driver.json")
-    await driver.api.init(os.path.abspath(driver_json_path), setup_handler)
+    await driver.api.init(str(_driver_json_path()), setup_handler)
     await driver.register_all_device_instances(connect=False)
 
     device_count = len(list(config_manager.all()))

@@ -49,6 +49,30 @@ json_value() {
   fi
 }
 
+write_driver_metadata() {
+  local output="$1"
+  local release_date
+  release_date="$(date -u +%F)"
+
+  if command -v jq >/dev/null 2>&1; then
+    jq --arg version "$VERSION" --arg release_date "$release_date" \
+      '.version = $version | .release_date = $release_date' \
+      driver.json > "$output"
+  elif command -v python3 >/dev/null 2>&1; then
+    python3 -c 'import json, sys
+with open("driver.json", encoding="utf-8") as f:
+    data = json.load(f)
+data["version"] = sys.argv[2]
+data["release_date"] = sys.argv[3]
+with open(sys.argv[1], "w", encoding="utf-8") as f:
+    json.dump(data, f, indent=2)
+    f.write("\n")' "$output" "$VERSION" "$release_date"
+  else
+    echo "Missing required command: jq or python3" >&2
+    exit 1
+  fi
+}
+
 cd "$ROOT_DIR"
 
 VERSION="${VERSION:-${1:-$(json_value version)}}"
@@ -72,7 +96,9 @@ if [[ "$(uname -s)" == "Linux" ]]; then
 fi
 
 echo "Building intg-${DRIVER_BASE} with ${IMAGE} for ${BUILD_PLATFORM}..."
-rm -rf artifacts "dist/intg-${DRIVER_BASE}" "${ARTIFACT_NAME}.tar.gz" "intg-${DRIVER_BASE}.spec"
+rm -rf artifacts build_metadata "dist/intg-${DRIVER_BASE}" "${ARTIFACT_NAME}.tar.gz" "intg-${DRIVER_BASE}.spec"
+mkdir -p build_metadata
+write_driver_metadata build_metadata/driver.json
 
 docker run --rm --name "builder-${DRIVER_BASE}-$$" \
   --platform="${BUILD_PLATFORM}" \
@@ -81,14 +107,32 @@ docker run --rm --name "builder-${DRIVER_BASE}-$$" \
   "${IMAGE}" \
   bash -c "cd /workspace && \
     python -m pip install -r requirements.txt && \
-    pyinstaller --clean --onedir --name intg-${DRIVER_BASE} --collect-all zeroconf uc_intg_spotify/driver.py"
+    pyinstaller --clean --onedir --name intg-${DRIVER_BASE} \
+      --add-data build_metadata/driver.json:. \
+      --collect-all zeroconf \
+      --collect-all ucapi \
+      --collect-all ucapi_framework \
+      --hidden-import uc_intg_spotify.driver \
+      --hidden-import uc_intg_spotify.device \
+      --hidden-import uc_intg_spotify.config \
+      --hidden-import uc_intg_spotify.client \
+      --hidden-import uc_intg_spotify.media_player \
+      --hidden-import uc_intg_spotify.remote \
+      --hidden-import uc_intg_spotify.browser \
+      --hidden-import uc_intg_spotify.setup \
+      --hidden-import uc_intg_spotify.select \
+      --hidden-import uc_intg_spotify.sensor \
+      --hidden-import uc_intg_spotify.discovery \
+      --paths . \
+      uc_intg_spotify/__main__.py"
 
 mkdir -p artifacts/bin
 mv "dist/intg-${DRIVER_BASE}"/* artifacts/bin
 mv "artifacts/bin/intg-${DRIVER_BASE}" artifacts/bin/driver
-cp driver.json artifacts/
+cp build_metadata/driver.json artifacts/driver.json
 
 tar czvf "${ARTIFACT_NAME}.tar.gz" -C "${ROOT_DIR}/artifacts" .
+rm -rf build_metadata
 rm -f "intg-${DRIVER_BASE}.spec"
 
 echo

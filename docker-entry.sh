@@ -1,5 +1,5 @@
 #!/bin/bash
 
-cd /usr/src/app
+cd /app
 pip install --no-cache-dir -q -r requirements.txt
-python uc_intg_spotify/driver.py
+python -m uc_intg_spotify
