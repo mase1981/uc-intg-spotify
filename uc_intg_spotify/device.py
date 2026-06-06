@@ -69,6 +69,8 @@ class SpotifyDevice(PollingDevice):
         self._duration: int = 0
         self._position: int = 0
         self._volume: int = 0
+        self._muted: bool = False
+        self._last_nonzero_volume: int = 50
         self._shuffle: bool = False
         self._repeat: str = "off"
         self._media_uri: str = ""
@@ -132,6 +134,17 @@ class SpotifyDevice(PollingDevice):
             self._state = "PAUSED" if self._title else "ON"
         self.push_update()
 
+    def set_volume_state(self, volume: int) -> None:
+        """Optimistically update volume and inferred mute state."""
+        self._volume = max(0, min(100, volume))
+        self._muted = self._volume == 0
+        if self._volume > 0:
+            self._last_nonzero_volume = self._volume
+        self.push_update()
+
+    def get_unmute_volume(self) -> int:
+        return max(1, min(100, self._last_nonzero_volume or 50))
+
     def schedule_playback_refresh(self) -> None:
         """Debounce playback refreshes after Spotify playback commands."""
         if self._playback_refresh_task:
@@ -180,6 +193,9 @@ class SpotifyDevice(PollingDevice):
                 self._duration = playback.get("duration_ms", 0) // 1000
                 self._position = playback.get("progress_ms", 0) // 1000
                 self._volume = playback.get("volume_percent", 0)
+                self._muted = self._volume == 0
+                if self._volume > 0:
+                    self._last_nonzero_volume = self._volume
                 self._shuffle = playback.get("shuffle_state", False)
                 self._repeat = playback.get("repeat_state", "off")
                 self._media_uri = playback.get("uri", "")
@@ -212,6 +228,9 @@ class SpotifyDevice(PollingDevice):
                 self._position = 0
                 self._media_uri = ""
                 self._volume = playback.get("volume_percent", 0)
+                self._muted = self._volume == 0
+                if self._volume > 0:
+                    self._last_nonzero_volume = self._volume
                 self._shuffle = playback.get("shuffle_state", False)
                 self._repeat = playback.get("repeat_state", "off")
                 self._disallows = playback.get("disallows", {})
@@ -225,6 +244,7 @@ class SpotifyDevice(PollingDevice):
                 self._duration = 0
                 self._position = 0
                 self._media_uri = ""
+                self._muted = self._volume == 0
                 self._disallows = {}
 
             self._devices = devices

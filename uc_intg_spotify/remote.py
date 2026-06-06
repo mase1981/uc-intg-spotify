@@ -22,6 +22,9 @@ SIMPLE_COMMANDS = [
     "PREVIOUS",
     "VOLUME_UP",
     "VOLUME_DOWN",
+    "MUTE_TOGGLE",
+    "MUTE",
+    "UNMUTE",
     "SHUFFLE",
     "REPEAT",
     "ADD_TO_QUEUE",
@@ -41,13 +44,7 @@ class SpotifyRemote(RemoteEntity):
             features=[remote.Features.SEND_CMD],
             attributes={remote.Attributes.STATE: remote.States.UNAVAILABLE},
             simple_commands=SIMPLE_COMMANDS,
-            button_mapping=[
-                create_btn_mapping(Buttons.PLAY, "PLAY_PAUSE"),
-                create_btn_mapping(Buttons.NEXT, "NEXT"),
-                create_btn_mapping(Buttons.PREV, "PREVIOUS"),
-                create_btn_mapping(Buttons.VOLUME_UP, "VOLUME_UP"),
-                create_btn_mapping(Buttons.VOLUME_DOWN, "VOLUME_DOWN"),
-            ],
+            button_mapping=_create_button_mappings(),
             ui_pages=_create_ui_pages(),
             cmd_handler=self._handle_command,
         )
@@ -114,12 +111,26 @@ class SpotifyRemote(RemoteEntity):
             new_vol = min(100, self._device._volume + 1)
             ok = await client.set_volume(new_vol)
             if ok:
-                self._device._volume = new_vol
+                self._device.set_volume_state(new_vol)
         elif command == "VOLUME_DOWN":
             new_vol = max(0, self._device._volume - 1)
             ok = await client.set_volume(new_vol)
             if ok:
-                self._device._volume = new_vol
+                self._device.set_volume_state(new_vol)
+        elif command == "MUTE_TOGGLE":
+            volume = self._device.get_unmute_volume() if self._device._muted else 0
+            ok = await client.set_volume(volume)
+            if ok:
+                self._device.set_volume_state(volume)
+        elif command == "MUTE":
+            ok = await client.set_volume(0)
+            if ok:
+                self._device.set_volume_state(0)
+        elif command == "UNMUTE":
+            volume = self._device.get_unmute_volume()
+            ok = await client.set_volume(volume)
+            if ok:
+                self._device.set_volume_state(volume)
         elif command == "SHUFFLE":
             ok = await client.set_shuffle(not self._device._shuffle)
         elif command == "REPEAT":
@@ -130,6 +141,19 @@ class SpotifyRemote(RemoteEntity):
             return StatusCodes.NOT_IMPLEMENTED
 
         return StatusCodes.OK if ok else StatusCodes.SERVER_ERROR
+
+
+def _create_button_mappings() -> list[Any]:
+    mappings = [
+        create_btn_mapping(Buttons.PLAY, "PLAY_PAUSE"),
+        create_btn_mapping(Buttons.NEXT, "NEXT"),
+        create_btn_mapping(Buttons.PREV, "PREVIOUS"),
+        create_btn_mapping(Buttons.VOLUME_UP, "VOLUME_UP"),
+        create_btn_mapping(Buttons.VOLUME_DOWN, "VOLUME_DOWN"),
+    ]
+    if mute_button := getattr(Buttons, "MUTE", None):
+        mappings.append(create_btn_mapping(mute_button, "MUTE_TOGGLE"))
+    return mappings
 
 
 def _create_ui_pages() -> list[UiPage]:
