@@ -492,7 +492,7 @@ async def _browse_playlist_tracks(
     playlist_images = data.get("images", [])
     playlist_thumbnail = playlist_images[0]["url"] if playlist_images else None
 
-    tracks_data = data.get("tracks", {})
+    tracks_data = data.get("tracks") or data.get("items") or {}
     items = []
     for item_data in tracks_data.get("items", []):
         track = item_data.get("track")

@@ -22,6 +22,14 @@ class SpotifySetupFlow(BaseSetupFlow[SpotifyDeviceConfig]):
         self._client_secret: str = ""
 
     def get_manual_entry_form(self) -> RequestUserInput:
+        existing_client_id = ""
+        existing_client_secret = ""
+        if self._selected_config_id:
+            existing = self.config.get(self._selected_config_id)
+            if existing:
+                existing_client_id = existing.client_id
+                existing_client_secret = existing.client_secret
+
         return RequestUserInput(
             {"en": "Spotify Setup"},
             [
@@ -37,7 +45,9 @@ class SpotifySetupFlow(BaseSetupFlow[SpotifyDeviceConfig]):
                                 "3. App Name: 'UC Remote Integration'\n"
                                 "4. Redirect URI: https://example.com/callback\n"
                                 "5. Check 'Web API' and save\n"
-                                "6. Copy Client ID and Client Secret below"
+                                "6. Copy Client ID and Client Secret below\n\n"
+                                "Re-authenticating? Confirm the values below and continue "
+                                "to sign in again (Spotify refresh tokens expire after 6 months)."
                             }
                         }
                     },
@@ -45,12 +55,12 @@ class SpotifySetupFlow(BaseSetupFlow[SpotifyDeviceConfig]):
                 {
                     "id": "client_id",
                     "label": {"en": "Spotify Client ID"},
-                    "field": {"text": {"value": ""}},
+                    "field": {"text": {"value": existing_client_id}},
                 },
                 {
                     "id": "client_secret",
                     "label": {"en": "Spotify Client Secret"},
-                    "field": {"text": {"value": ""}},
+                    "field": {"text": {"value": existing_client_secret}},
                 },
             ],
         )

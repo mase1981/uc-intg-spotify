@@ -18,6 +18,10 @@ SPOTIFY_API_BASE_URL = "https://api.spotify.com/v1"
 
 REDIRECT_URI = "https://example.com/callback"
 
+
+class SpotifyAuthError(Exception):
+    """Raised when the refresh token is permanently invalid and re-authentication is required."""
+
 SCOPES = [
     "user-read-currently-playing",
     "user-read-playback-state",
@@ -138,9 +142,14 @@ class SpotifyClient:
                     if self._on_token_refresh:
                         self._on_token_refresh(token_data)
                     return token_data
-                error = await response.text()
-                _LOG.error("Token refresh failed: %s - %s", response.status, error)
+
+                error_body = await response.text()
+                _LOG.error("Token refresh failed: %s - %s", response.status, error_body)
+                if response.status == 400 and "invalid_grant" in error_body:
+                    raise SpotifyAuthError("Refresh token rejected (invalid_grant)")
                 return None
+        except SpotifyAuthError:
+            raise
         except Exception as e:
             _LOG.error("Error refreshing token: %s", e)
             return None
@@ -181,6 +190,8 @@ class SpotifyClient:
                 body = await response.text()
                 _LOG.error("API %s %s failed: %s - %s", method, endpoint, response.status, body[:500])
                 return None
+        except SpotifyAuthError:
+            raise
         except Exception as e:
             _LOG.error("API request error: %s", e)
             return None
@@ -188,7 +199,7 @@ class SpotifyClient:
     # ── Playback State ──
 
     async def get_playback_state(self) -> dict[str, Any] | None:
-        data = await self._api_request("GET", "/me/player?market=from_token")
+        data = await self._api_request("GET", "/me/player")
         if not data:
             return None
 
@@ -302,26 +313,24 @@ class SpotifyClient:
         )
 
     async def get_playlist(self, playlist_id: str) -> dict[str, Any] | None:
-        return await self._api_request(
-            "GET", f"/playlists/{playlist_id}?market=from_token"
-        )
+        return await self._api_request("GET", f"/playlists/{playlist_id}")
 
     async def get_saved_tracks(
         self, limit: int = 50, offset: int = 0
     ) -> dict[str, Any] | None:
         return await self._api_request(
-            "GET", f"/me/tracks?limit={limit}&offset={offset}&market=from_token"
+            "GET", f"/me/tracks?limit={limit}&offset={offset}"
         )
 
     async def get_saved_albums(
         self, limit: int = 50, offset: int = 0
     ) -> dict[str, Any] | None:
         return await self._api_request(
-            "GET", f"/me/albums?limit={limit}&offset={offset}&market=from_token"
+            "GET", f"/me/albums?limit={limit}&offset={offset}"
         )
 
     async def get_album(self, album_id: str) -> dict[str, Any] | None:
-        return await self._api_request("GET", f"/albums/{album_id}?market=from_token")
+        return await self._api_request("GET", f"/albums/{album_id}")
 
     async def get_artist(self, artist_id: str) -> dict[str, Any] | None:
         return await self._api_request("GET", f"/artists/{artist_id}")
@@ -355,7 +364,7 @@ class SpotifyClient:
         self, limit: int = 50, offset: int = 0
     ) -> dict[str, Any] | None:
         return await self._api_request(
-            "GET", f"/me/top/tracks?limit={limit}&offset={offset}&market=from_token"
+            "GET", f"/me/top/tracks?limit={limit}&offset={offset}"
         )
 
     async def get_followed_artists(self, limit: int = 50) -> dict[str, Any] | None:
@@ -370,18 +379,14 @@ class SpotifyClient:
             "GET", f"/browse/new-releases?limit={limit}&offset={offset}"
         )
 
-    async def get_categories(self, limit: int = 20) -> dict[str, Any] | None:
-        return await self._api_request(
-            "GET", f"/browse/categories?limit={limit}"
-        )
-
     async def search(
         self, query: str, limit: int = 20, offset: int = 0
     ) -> dict[str, Any] | None:
         encoded = urllib.parse.quote(query)
+        limit = max(1, min(limit, 10))
         return await self._api_request(
             "GET",
-            f"/search?q={encoded}&type=track,album,artist,playlist&limit={limit}&offset={offset}&market=from_token",
+            f"/search?q={encoded}&type=track,album,artist,playlist&limit={limit}&offset={offset}",
         )
 
     async def get_user_profile(self) -> dict[str, Any] | None:
