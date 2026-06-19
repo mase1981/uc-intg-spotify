@@ -8,6 +8,8 @@ from ucapi import remote, StatusCodes
 from ucapi.ui import Buttons, Size, UiPage, create_btn_mapping, create_ui_icon, create_ui_text
 from ucapi_framework import RemoteEntity
 
+from uc_intg_spotify.config import account_suffix
+
 if TYPE_CHECKING:
     from uc_intg_spotify.config import SpotifyDeviceConfig
     from uc_intg_spotify.device import SpotifyDevice
@@ -40,7 +42,7 @@ class SpotifyRemote(RemoteEntity):
         entity_id = f"remote.{device_config.identifier}.remote"
         super().__init__(
             entity_id,
-            "Spotify Remote",
+            f"Spotify Remote{account_suffix(device_config)}",
             features=[remote.Features.SEND_CMD],
             attributes={remote.Attributes.STATE: remote.States.UNAVAILABLE},
             simple_commands=SIMPLE_COMMANDS,

@@ -14,3 +14,13 @@ class SpotifyDeviceConfig:
     refresh_token: str = ""
     token_expires_at: int = 0
     polling_interval: int = 10
+    user_id: str = ""
+
+
+def account_suffix(config: SpotifyDeviceConfig) -> str:
+    """Label suffix appended to entity names to tell multiple accounts apart.
+
+    The primary account keeps the bare ``spotify`` identifier and gets no suffix, so
+    its entity names stay identical to single-account installs.
+    """
+    return "" if config.identifier == "spotify" else f" ({config.name})"

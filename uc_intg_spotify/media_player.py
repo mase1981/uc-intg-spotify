@@ -9,6 +9,7 @@ from ucapi.media_player import BrowseOptions, BrowseResults, SearchOptions, Sear
 from ucapi_framework import MediaPlayerEntity
 
 from uc_intg_spotify import browser
+from uc_intg_spotify.config import account_suffix
 
 if TYPE_CHECKING:
     from uc_intg_spotify.config import SpotifyDeviceConfig
@@ -26,7 +27,7 @@ class SpotifyMediaPlayer(MediaPlayerEntity):
         entity_id = f"media_player.{device_config.identifier}.player"
         super().__init__(
             entity_id,
-            "Spotify Player",
+            f"Spotify Player{account_suffix(device_config)}",
             features=[
                 media_player.Features.ON_OFF,
                 media_player.Features.PLAY_PAUSE,
@@ -262,10 +263,15 @@ class SpotifyMediaPlayer(MediaPlayerEntity):
             return StatusCodes.BAD_REQUEST
 
         device_id = None
+        target_volume = None
         if not self._device._is_playing:
             device_id = self._device.get_first_available_device_id()
+            if device_id:
+                target_volume = self._device.get_device_volume(device_id)
 
         ok = await client.play_uri(uri, device_id)
+        if ok and device_id and target_volume is not None:
+            await client.set_volume(target_volume, device_id)
         return StatusCodes.OK if ok else StatusCodes.SERVER_ERROR
 
 

@@ -261,11 +261,12 @@ class SpotifyClient:
     async def previous_track(self) -> bool:
         return await self._api_request("POST", "/me/player/previous") is not None
 
-    async def set_volume(self, volume_percent: int) -> bool:
+    async def set_volume(self, volume_percent: int, device_id: str | None = None) -> bool:
         volume_percent = max(0, min(100, volume_percent))
-        return await self._api_request(
-            "PUT", f"/me/player/volume?volume_percent={volume_percent}"
-        ) is not None
+        endpoint = f"/me/player/volume?volume_percent={volume_percent}"
+        if device_id:
+            endpoint += f"&device_id={device_id}"
+        return await self._api_request("PUT", endpoint) is not None
 
     async def seek(self, position_ms: int) -> bool:
         return await self._api_request(
@@ -313,24 +314,28 @@ class SpotifyClient:
         )
 
     async def get_playlist(self, playlist_id: str) -> dict[str, Any] | None:
-        return await self._api_request("GET", f"/playlists/{playlist_id}")
+        return await self._api_request(
+            "GET", f"/playlists/{playlist_id}?market=from_token"
+        )
 
     async def get_saved_tracks(
         self, limit: int = 50, offset: int = 0
     ) -> dict[str, Any] | None:
         return await self._api_request(
-            "GET", f"/me/tracks?limit={limit}&offset={offset}"
+            "GET", f"/me/tracks?limit={limit}&offset={offset}&market=from_token"
         )
 
     async def get_saved_albums(
         self, limit: int = 50, offset: int = 0
     ) -> dict[str, Any] | None:
         return await self._api_request(
-            "GET", f"/me/albums?limit={limit}&offset={offset}"
+            "GET", f"/me/albums?limit={limit}&offset={offset}&market=from_token"
         )
 
     async def get_album(self, album_id: str) -> dict[str, Any] | None:
-        return await self._api_request("GET", f"/albums/{album_id}")
+        return await self._api_request(
+            "GET", f"/albums/{album_id}?market=from_token"
+        )
 
     async def get_artist(self, artist_id: str) -> dict[str, Any] | None:
         return await self._api_request("GET", f"/artists/{artist_id}")
@@ -386,7 +391,7 @@ class SpotifyClient:
         limit = max(1, min(limit, 10))
         return await self._api_request(
             "GET",
-            f"/search?q={encoded}&type=track,album,artist,playlist&limit={limit}&offset={offset}",
+            f"/search?q={encoded}&type=track,album,artist,playlist&limit={limit}&offset={offset}&market=from_token",
         )
 
     async def get_user_profile(self) -> dict[str, Any] | None:

@@ -127,6 +127,12 @@ class SpotifyDevice(PollingDevice):
             return self._devices[0].get("id")
         return None
 
+    def get_device_volume(self, device_id: str) -> int | None:
+        for dev in self._devices:
+            if dev.get("id") == device_id and dev.get("supports_volume"):
+                return dev.get("volume_percent")
+        return None
+
     def set_playing_state(self, is_playing: bool) -> None:
         self._is_playing = is_playing
         if is_playing:

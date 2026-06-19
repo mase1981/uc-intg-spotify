@@ -8,6 +8,8 @@ from ucapi import StatusCodes
 from ucapi.select import Attributes, Commands, Select, States
 from ucapi_framework import SelectEntity
 
+from uc_intg_spotify.config import account_suffix
+
 if TYPE_CHECKING:
     from uc_intg_spotify.config import SpotifyDeviceConfig
     from uc_intg_spotify.device import SpotifyDevice
@@ -25,7 +27,7 @@ class SpotifyDeviceSelect(SelectEntity):
 
         super().__init__(
             entity_id,
-            "Spotify Active Device",
+            f"Spotify Active Device{account_suffix(device_config)}",
             {
                 Attributes.STATE: States.UNAVAILABLE,
                 Attributes.OPTIONS: [],

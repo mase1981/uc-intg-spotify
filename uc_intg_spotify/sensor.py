@@ -7,6 +7,8 @@ from typing import Any, TYPE_CHECKING
 from ucapi.sensor import Attributes, DeviceClasses, Sensor, States
 from ucapi_framework import SensorEntity
 
+from uc_intg_spotify.config import account_suffix
+
 if TYPE_CHECKING:
     from uc_intg_spotify.config import SpotifyDeviceConfig
     from uc_intg_spotify.device import SpotifyDevice
@@ -24,7 +26,7 @@ class SpotifyNowPlayingSensor(SensorEntity):
 
         super().__init__(
             entity_id,
-            "Spotify Now Playing",
+            f"Spotify Now Playing{account_suffix(device_config)}",
             [],
             {
                 Attributes.STATE: States.UNAVAILABLE,
@@ -59,7 +61,7 @@ class SpotifyDeviceSensor(SensorEntity):
 
         super().__init__(
             entity_id,
-            "Spotify Active Device",
+            f"Spotify Active Device{account_suffix(device_config)}",
             [],
             {
                 Attributes.STATE: States.UNAVAILABLE,

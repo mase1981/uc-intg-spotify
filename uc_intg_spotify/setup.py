@@ -133,23 +133,66 @@ class SpotifySetupFlow(BaseSetupFlow[SpotifyDeviceConfig]):
         token_data = await client.exchange_code_for_token(
             auth_code, self._client_id, self._client_secret
         )
-        await client.close()
 
         if not token_data:
+            await client.close()
             raise ConnectionError("Failed to authenticate with Spotify")
 
         access_token = token_data["access_token"]
         refresh_token = token_data["refresh_token"]
         expires_in = token_data.get("expires_in", 3600)
 
+        client.set_tokens(access_token, refresh_token)
+        profile = await client.get_user_profile()
+        await client.close()
+
+        user_id = (profile or {}).get("id", "")
+        display_name = ((profile or {}).get("display_name") or "").strip()
+
+        identifier, name = self._resolve_account_identity(user_id, display_name)
+
         import time
 
         return SpotifyDeviceConfig(
-            identifier="spotify",
-            name="Spotify",
+            identifier=identifier,
+            name=name,
             client_id=self._client_id,
             client_secret=self._client_secret,
             access_token=access_token,
             refresh_token=refresh_token,
             token_expires_at=int(time.time()) + expires_in - 60,
+            user_id=user_id,
         )
+
+    def _resolve_account_identity(
+        self, user_id: str, display_name: str
+    ) -> tuple[str, str]:
+        """Map a Spotify account to a stable identifier and display name.
+
+        The first/primary account keeps the legacy ``spotify`` identifier so existing
+        installs (and their activities) are preserved. Additional accounts are keyed by
+        the Spotify profile id, mirroring Home Assistant's per-account config entries.
+        """
+        if self._selected_config_id:
+            existing = self.config.get(self._selected_config_id)
+            name = display_name or (existing.name if existing else "") or "Spotify"
+            return self._selected_config_id, name
+
+        existing_accounts = list(self.config.all())
+
+        if user_id:
+            for account in existing_accounts:
+                if getattr(account, "user_id", "") == user_id:
+                    raise ValueError(
+                        f"This Spotify account ({display_name or user_id}) is already configured"
+                    )
+
+        if not existing_accounts:
+            return "spotify", display_name or "Spotify"
+
+        if not user_id:
+            raise ConnectionError(
+                "Could not read the Spotify profile needed to add another account. Please try again."
+            )
+
+        return f"spotify_{user_id}", display_name or f"Spotify ({user_id})"
