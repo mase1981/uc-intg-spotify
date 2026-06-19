@@ -13,7 +13,12 @@ from ucapi_framework import DeviceEvents, PollingDevice
 
 from uc_intg_spotify.client import SpotifyAuthError, SpotifyClient
 from uc_intg_spotify.config import SpotifyDeviceConfig
-from uc_intg_spotify.discovery import SpotifyDiscovery, resolve_device_names, _is_junk_name
+from uc_intg_spotify.discovery import (
+    SpotifyDiscovery,
+    activate_connect_device,
+    resolve_device_names,
+    _is_junk_name,
+)
 
 _LOG = logging.getLogger(__name__)
 
@@ -21,6 +26,8 @@ _HEX_HASH_RE = re.compile(r"^[0-9a-f]{32,}$", re.IGNORECASE)
 
 DEVICE_CACHE_TTL = 86400  # 24 hours
 PLAYBACK_REFRESH_DELAY = 0.5
+ACTIVATION_POLL_ATTEMPTS = 20
+ACTIVATION_POLL_INTERVAL = 1.0
 
 _DEVICE_TYPE_LABELS = {
     "Computer": "Computer",
@@ -88,6 +95,7 @@ class SpotifyDevice(PollingDevice):
         self._device_cache: dict[str, dict[str, Any]] = {}
         self._discovery = SpotifyDiscovery(on_update=self._on_zeroconf_update)
         self._playback_refresh_task: asyncio.Task[None] | None = None
+        self._login_id: str = device_config.user_id or ""
 
     @property
     def identifier(self) -> str:
@@ -126,6 +134,72 @@ class SpotifyDevice(PollingDevice):
         if self._devices:
             return self._devices[0].get("id")
         return None
+
+    def _find_zeroconf_device_by_name(self, name: str) -> dict[str, Any] | None:
+        for zc_dev in self._discovery.devices.values():
+            if zc_dev.get("name") == name and zc_dev.get("ip") and zc_dev.get("port"):
+                return zc_dev
+        return None
+
+    async def _ensure_login_id(self) -> str:
+        if self._login_id:
+            return self._login_id
+        if self._client:
+            profile = await self._client.get_user_profile()
+            self._login_id = (profile or {}).get("id", "")
+            if self._login_id:
+                self.update_config(user_id=self._login_id)
+        return self._login_id
+
+    async def select_source(self, name: str) -> bool:
+        """Transfer playback to a device by display name, activating it over the LAN
+        first if it is an inactive Spotify Connect device not yet known to the Web API."""
+        if not self._client:
+            return False
+
+        device_id = self.get_device_id_by_name(name)
+        if device_id and any(d.get("id") == device_id for d in self._devices):
+            return await self._client.transfer_playback(device_id)
+
+        zc_dev = self._find_zeroconf_device_by_name(name)
+        if zc_dev:
+            activated = await self._activate_device(zc_dev)
+            if activated:
+                self.schedule_playback_refresh()
+                return True
+            return False
+
+        if device_id:
+            return await self._client.transfer_playback(device_id)
+        return False
+
+    async def _activate_device(self, zc_dev: dict[str, Any]) -> bool:
+        login_id = await self._ensure_login_id()
+        await self._client.ensure_fresh_token()
+
+        device_id = await activate_connect_device(
+            zc_dev["ip"], zc_dev["port"], zc_dev.get("cpath", "/zc"),
+            self._client.access_token, login_id,
+        )
+        if device_id is None:
+            _LOG.info("[%s] Could not activate Connect device '%s'", self.log_id, zc_dev.get("name"))
+            return False
+
+        target = device_id or zc_dev.get("device_id", "")
+        for _ in range(ACTIVATION_POLL_ATTEMPTS):
+            await asyncio.sleep(ACTIVATION_POLL_INTERVAL)
+            devices = await self._client.get_available_devices()
+            self._devices = devices
+            match = None
+            if target:
+                match = next((d for d in devices if d.get("id") == target), None)
+            if not match:
+                match = next((d for d in devices if device_display_name(d) == zc_dev.get("name")), None)
+            if match and match.get("id"):
+                return await self._client.transfer_playback(match["id"])
+
+        _LOG.info("[%s] Device '%s' did not register after activation", self.log_id, zc_dev.get("name"))
+        return False
 
     def get_device_volume(self, device_id: str) -> int | None:
         for dev in self._devices:

@@ -33,6 +33,7 @@ SCOPES = [
     "user-top-read",
     "user-read-recently-played",
     "user-follow-read",
+    "streaming",
 ]
 
 
@@ -60,6 +61,15 @@ class SpotifyClient:
 
     def is_authenticated(self) -> bool:
         return bool(self._access_token and self._refresh_token)
+
+    @property
+    def access_token(self) -> str:
+        return self._access_token
+
+    async def ensure_fresh_token(self) -> bool:
+        """Force a token refresh so callers outside the Web API path (e.g. Zeroconf
+        device activation) use a valid access token."""
+        return await self.refresh_access_token() is not None
 
     async def _get_session(self) -> aiohttp.ClientSession:
         if self._session is None or self._session.closed:

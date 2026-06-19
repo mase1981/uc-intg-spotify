@@ -58,12 +58,7 @@ class SpotifyDeviceSelect(SelectEntity):
             if not option:
                 return StatusCodes.BAD_REQUEST
 
-            device_id = self._device.get_device_id_by_name(option)
-            if not device_id:
-                _LOG.warning("Device not found for option: %s", option)
-                return StatusCodes.BAD_REQUEST
-
-            ok = await client.transfer_playback(device_id)
+            ok = await self._device.select_source(option)
             return StatusCodes.OK if ok else StatusCodes.SERVER_ERROR
 
         if cmd_id == Commands.SELECT_NEXT:
@@ -92,9 +87,5 @@ class SpotifyDeviceSelect(SelectEntity):
         new_idx = (idx + direction) % len(options)
         new_option = options[new_idx]
 
-        device_id = self._device.get_device_id_by_name(new_option)
-        if not device_id:
-            return StatusCodes.BAD_REQUEST
-
-        ok = await client.transfer_playback(device_id)
+        ok = await self._device.select_source(new_option)
         return StatusCodes.OK if ok else StatusCodes.SERVER_ERROR

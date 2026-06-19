@@ -164,6 +164,53 @@ async def resolve_device_names(discovery: SpotifyDiscovery) -> None:
             _LOG.debug("Zeroconf: could not resolve info for %s", service_name)
 
 
+async def activate_connect_device(
+    ip: str, port: int, cpath: str, access_token: str, login_id: str
+) -> str | None:
+    """Activate an inactive Spotify Connect device over the LAN so it registers with
+    Spotify and becomes a valid Web API playback target.
+
+    Uses the Zeroconf ``addUser`` action with the user's OAuth access token (devices
+    reporting ``tokenType=accesstoken``). Returns the device id on success, else None.
+    """
+    base = f"http://{ip}:{port}{cpath}"
+    timeout = aiohttp.ClientTimeout(total=6)
+    try:
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.get(f"{base}?action=getInfo&version=2.7.1") as resp:
+                if resp.status != 200:
+                    return None
+                info = await resp.json(content_type=None)
+
+            device_id = info.get("deviceID") or info.get("deviceId") or ""
+            if info.get("tokenType") != "accesstoken":
+                _LOG.debug("Zeroconf: device %s tokenType=%r not activatable via access token",
+                           device_id, info.get("tokenType"))
+                return None
+
+            data = {
+                "action": "addUser",
+                "version": "2.7.1",
+                "tokenType": "accesstoken",
+                "clientKey": "",
+                "loginId": login_id or "",
+                "userName": login_id or "",
+                "blob": access_token,
+            }
+            async with session.post(base, data=data) as resp:
+                if resp.status != 200:
+                    return None
+                result = await resp.json(content_type=None)
+
+        if result.get("status") == 101 and result.get("spotifyError", 1) == 0:
+            return device_id or ""
+        _LOG.debug("Zeroconf addUser rejected for %s: %s", device_id, result)
+        return None
+    except Exception as err:
+        _LOG.debug("Zeroconf activation failed for %s:%s: %s", ip, port, err)
+        return None
+
+
 async def _query_device_info(ip: str, port: int, cpath: str) -> dict[str, str] | None:
     """Query a Spotify Connect device's getInfo endpoint."""
     url = f"http://{ip}:{port}{cpath}?action=getInfo&version=2.7.1"

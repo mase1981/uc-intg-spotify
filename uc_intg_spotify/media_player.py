@@ -241,12 +241,7 @@ class SpotifyMediaPlayer(MediaPlayerEntity):
         if not source:
             return StatusCodes.BAD_REQUEST
 
-        device_id = self._device.get_device_id_by_name(source)
-        if not device_id:
-            _LOG.warning("Device not found: %s", source)
-            return StatusCodes.BAD_REQUEST
-
-        ok = await client.transfer_playback(device_id)
+        ok = await self._device.select_source(source)
         return StatusCodes.OK if ok else StatusCodes.SERVER_ERROR
 
     async def _handle_play_media(self, client, params: dict[str, Any] | None) -> StatusCodes:
