@@ -219,8 +219,8 @@ async def _query_device_info(ip: str, port: int, cpath: str) -> dict[str, str] |
         async with aiohttp.ClientSession(timeout=timeout) as session:
             async with session.get(url) as resp:
                 if resp.status == 200:
-                    data = await resp.json()
-                    device_id = data.get("deviceId", "")
+                    data = await resp.json(content_type=None)
+                    device_id = data.get("deviceID") or data.get("deviceId", "")
                     remote_name = data.get("remoteName", "")
                     if not remote_name or _is_junk_name(remote_name):
                         aliases = data.get("aliases", [])

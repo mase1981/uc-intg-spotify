@@ -96,6 +96,7 @@ class SpotifyDevice(PollingDevice):
         self._discovery = SpotifyDiscovery(on_update=self._on_zeroconf_update)
         self._playback_refresh_task: asyncio.Task[None] | None = None
         self._login_id: str = device_config.user_id or ""
+        self._resolved_names: dict[str, str] = {}
 
     @property
     def identifier(self) -> str:
@@ -430,19 +431,21 @@ class SpotifyDevice(PollingDevice):
         return result
 
     def _enrich_api_device_names(self) -> None:
-        """Use Zeroconf-resolved names to fix API devices with hex hash names."""
-        zc_by_id: dict[str, str] = {}
+        """Use Zeroconf-resolved names to fix API devices with hex hash names.
+
+        Resolved names are cached by device id so enrichment survives transient
+        Zeroconf gaps (devices that only answer mDNS queries intermittently)."""
         for zc_dev in self._discovery.devices.values():
             device_id = zc_dev.get("device_id", "")
             name = zc_dev.get("name", "")
-            if device_id and name:
-                zc_by_id[device_id] = name
+            if device_id and name and not _is_junk_name(name):
+                self._resolved_names[device_id] = name
 
         for dev in self._devices:
             api_name = dev.get("name", "")
             api_id = dev.get("id", "")
             if api_id and api_name and _HEX_HASH_RE.match(api_name):
-                resolved_name = zc_by_id.get(api_id, "")
+                resolved_name = self._resolved_names.get(api_id, "")
                 if resolved_name:
                     dev["_display_name"] = resolved_name
 
