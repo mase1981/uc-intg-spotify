@@ -1,6 +1,6 @@
 # Spotify Integration for Unfolded Circle Remote 2/3
 
-Control Spotify playback directly from your Unfolded Circle Remote 2 or Remote 3 with **full media browsing**, **search**, **Spotify Connect device switching**, and **real-time playback updates** with album artwork.
+Control Spotify playback directly from your Unfolded Circle Remote 2 or Remote 3 with **full media browsing**, **search**, **Spotify Connect device switching and waking**, **multiple accounts**, and **real-time playback updates** with album artwork.
 
 ![Spotify](https://img.shields.io/badge/Spotify-1DB954?style=flat-square&logo=spotify&logoColor=white)
 [![GitHub Release](https://img.shields.io/github/v/release/mase1981/uc-intg-spotify?style=flat-square)](https://github.com/mase1981/uc-intg-spotify/releases)
@@ -48,14 +48,24 @@ Browse and play your Spotify library directly from the Remote's media browser:
 - **Recently Played** — Recent listening history
 - **New Releases** — Latest album releases
 - **Search** — Full-text search across tracks, albums, artists, and playlists
+- **Availability Aware** — Tracks not available in your country are marked non-playable instead of failing silently
 
-### 🔊 Spotify Connect Device Switching
+### 🔊 Spotify Connect Device Switching & Waking
 
+- **Wake Inactive Devices** — Select a device that is powered and on the network but not signed into Spotify, and the integration wakes it (Zeroconf `addUser`) and transfers playback — no password needed
 - **Three-Source Discovery** — Devices from Spotify API + Zeroconf/mDNS + 24h cache
 - **Zeroconf/mDNS** — Discovers devices on your local network (even when idle)
 - **Smart Name Resolution** — Queries each device's getInfo endpoint for real friendly names
 - **Device Caching** — Previously-seen devices remain available for 24 hours
 - **Instant Switching** — Transfer playback between devices with one tap
+
+> **Waking notes:** Works with modern Spotify Connect devices (WiiM, Marantz/Denon HEOS, most certified AVRs & soundbars). A fully powered‑off device must be powered on first (e.g. via your AVR integration). Pure librespot devices (Raspotify/spotifyd) are discovered but cannot be woken this way. Requires the `streaming` permission — see [Upgrading](#upgrading).
+
+### 👥 Multiple Accounts
+
+- **Add More Than One Account** — Reconfigure the integration and choose **"Add a new device"** to sign in with another Spotify account
+- **Independent Entities** — Each account gets its own player, remote, select, and sensors, labeled by account name
+- **Backward Compatible** — Your first/primary account keeps its original entity IDs; additional accounts are keyed by Spotify profile
 
 ### 🎮 Remote Control
 
@@ -74,8 +84,9 @@ Browse and play your Spotify library directly from the Remote's media browser:
 
 ### Protocol & Requirements
 
-- **Protocol**: Spotify Web API (OAuth 2.0 Authorization Code Flow)
-- **Account**: Spotify Premium required (API no longer supports Free accounts)
+- **Protocol**: Spotify Web API (OAuth 2.0 Authorization Code Flow) + Spotify Connect Zeroconf for device waking
+- **Account**: Spotify Premium required (API no longer supports Free accounts); multiple accounts supported
+- **Permissions**: Includes the `streaming` scope, required to wake Spotify Connect devices
 - **Internet**: Required for Spotify API access
 - **Local Network**: Required for Zeroconf device discovery
 - **Polling**: 10-second intervals (configurable)
@@ -164,6 +175,17 @@ Five entities are created automatically:
 - **Spotify Active Device** — Select entity for device switching
 - **Spotify Now Playing** — Sensor showing current track
 - **Spotify Active Device** — Sensor showing active playback device
+
+### Adding Another Account
+
+1. Go to **Settings** → **Integrations** → **Spotify** → **Configure**
+2. Choose **"Add a new device"**
+3. Enter Client ID/Secret (you can reuse the same Spotify app) and authorize — **sign in with the other Spotify account** on the consent screen
+4. A second set of entities is created, labeled with that account's name
+
+## Upgrading
+
+Device waking adds the Spotify **`streaming`** permission. After upgrading from a version before 3.4.0, **reconfigure the integration and sign in again** so the new permission is granted. Existing playback control keeps working without it, but waking inactive devices will not.
 
 ## Credits
 
