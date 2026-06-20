@@ -193,6 +193,7 @@ Device waking adds the Spotify **`streaming`** permission. After upgrading from 
 - **Protocol**: Spotify Web API with OAuth 2.0
 - **Framework**: Unfolded Circle ucapi-framework
 - **Discovery**: Zeroconf/mDNS for Spotify Connect device resolution
+- **Inspiration**: Spotify Connect device waking (Zeroconf) and multi-account approach inspired by Todd Lucas ([thlucas1](https://github.com/thlucas1)) — [SpotifyPlus for Home Assistant](https://github.com/thlucas1/homeassistantcomponent_spotifyplus) and the [SpotifyWebApiPython](https://github.com/thlucas1/SpotifyWebApiPython) library
 - **Community**: Testing and feedback from UC community
 
 ## License
