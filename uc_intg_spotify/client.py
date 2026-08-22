@@ -309,6 +309,30 @@ class SpotifyClient:
 
         return await self._api_request("PUT", endpoint, json=body) is not None
 
+    async def play_context(
+        self, context_uri: str, offset_uri: str | None = None, device_id: str | None = None
+    ) -> bool:
+        body: dict[str, Any] = {"context_uri": context_uri}
+        if offset_uri:
+            body["offset"] = {"uri": offset_uri}
+
+        endpoint = "/me/player/play"
+        if device_id:
+            endpoint = f"/me/player/play?device_id={device_id}"
+
+        return await self._api_request("PUT", endpoint, json=body) is not None
+
+    async def play_uris(self, uris: list[str], device_id: str | None = None) -> bool:
+        if not uris:
+            return False
+
+        body: dict[str, Any] = {"uris": uris}
+        endpoint = "/me/player/play"
+        if device_id:
+            endpoint = f"/me/player/play?device_id={device_id}"
+
+        return await self._api_request("PUT", endpoint, json=body) is not None
+
     async def transfer_playback(self, device_id: str, play: bool = True) -> bool:
         return await self._api_request(
             "PUT", "/me/player", json={"device_ids": [device_id], "play": play}

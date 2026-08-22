@@ -243,10 +243,10 @@ async def _browse_saved_tracks(client: SpotifyClient, options: BrowseOptions) ->
         return _empty_browse("saved_tracks", "Liked Songs", page, limit)
 
     items = []
-    for saved in data.get("items", []):
+    for i, saved in enumerate(data.get("items", [])):
         track = saved.get("track")
         if track:
-            item = _track_to_browse_item(track)
+            item = _track_to_browse_item(track, context=("saved", str(offset + i)))
             if item:
                 items.append(item)
 
@@ -333,8 +333,8 @@ async def _browse_top_tracks(client: SpotifyClient, options: BrowseOptions) -> B
         return _empty_browse("top_tracks", "Top Tracks", page, limit)
 
     items = []
-    for track in data.get("items", []):
-        item = _track_to_browse_item(track)
+    for i, track in enumerate(data.get("items", [])):
+        item = _track_to_browse_item(track, context=("top", str(offset + i)))
         if item:
             items.append(item)
 
@@ -497,7 +497,7 @@ async def _browse_playlist_tracks(
     for item_data in tracks_data.get("items", []):
         track = item_data.get("track")
         if track and track.get("type") == "track":
-            item = _track_to_browse_item(track)
+            item = _track_to_browse_item(track, context=("playlist", playlist_id))
             if item:
                 items.append(item)
 
@@ -546,7 +546,7 @@ async def _browse_album_tracks(
             title=title,
             media_class=MediaClass.TRACK,
             media_type=MediaContentType.TRACK,
-            media_id=f"track_{track_id}",
+            media_id=_track_media_id(track_id, ("album", album_id)),
             can_browse=False,
             can_play=track.get("is_playable", True),
             thumbnail=album_thumbnail,
@@ -612,7 +612,9 @@ async def _browse_artist(
     )
 
 
-def _track_to_browse_item(track: dict) -> BrowseMediaItem | None:
+def _track_to_browse_item(
+    track: dict, context: tuple[str, str] | None = None
+) -> BrowseMediaItem | None:
     track_id = track.get("id", "")
     track_name = track.get("name", "")
     if not track_id or not track_name:
@@ -629,7 +631,7 @@ def _track_to_browse_item(track: dict) -> BrowseMediaItem | None:
         title=track_name,
         media_class=MediaClass.TRACK,
         media_type=MediaContentType.TRACK,
-        media_id=f"track_{track_id}",
+        media_id=_track_media_id(track_id, context),
         can_browse=False,
         can_play=track.get("is_playable", True),
         thumbnail=thumbnail,
@@ -637,6 +639,12 @@ def _track_to_browse_item(track: dict) -> BrowseMediaItem | None:
         album=album_name,
         duration=duration_ms // 1000,
     )
+
+
+def _track_media_id(track_id: str, context: tuple[str, str] | None) -> str:
+    if context:
+        return f"track_{track_id}~ctx~{context[0]}~{context[1]}"
+    return f"track_{track_id}"
 
 
 def _album_to_browse_item(album: dict) -> BrowseMediaItem | None:

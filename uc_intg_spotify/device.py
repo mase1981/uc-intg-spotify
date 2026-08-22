@@ -160,7 +160,7 @@ class SpotifyDevice(PollingDevice):
 
         device_id = self.get_device_id_by_name(name)
         if device_id and any(d.get("id") == device_id for d in self._devices):
-            return await self._client.transfer_playback(device_id)
+            return await self._client.transfer_playback(device_id, play=self._is_playing)
 
         zc_dev = self._find_zeroconf_device_by_name(name)
         if zc_dev:
@@ -171,7 +171,7 @@ class SpotifyDevice(PollingDevice):
             return False
 
         if device_id:
-            return await self._client.transfer_playback(device_id)
+            return await self._client.transfer_playback(device_id, play=self._is_playing)
         return False
 
     async def _activate_device(self, zc_dev: dict[str, Any]) -> bool:
@@ -197,7 +197,7 @@ class SpotifyDevice(PollingDevice):
             if not match:
                 match = next((d for d in devices if device_display_name(d) == zc_dev.get("name")), None)
             if match and match.get("id"):
-                return await self._client.transfer_playback(match["id"])
+                return await self._client.transfer_playback(match["id"], play=self._is_playing)
 
         _LOG.info("[%s] Device '%s' did not register after activation", self.log_id, zc_dev.get("name"))
         return False

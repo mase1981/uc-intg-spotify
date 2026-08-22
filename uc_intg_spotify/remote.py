@@ -29,7 +29,6 @@ SIMPLE_COMMANDS = [
     "UNMUTE",
     "SHUFFLE",
     "REPEAT",
-    "ADD_TO_QUEUE",
 ]
 
 

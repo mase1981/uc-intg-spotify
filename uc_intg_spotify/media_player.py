@@ -252,11 +252,6 @@ class SpotifyMediaPlayer(MediaPlayerEntity):
         if not media_id:
             return StatusCodes.BAD_REQUEST
 
-        uri = _media_id_to_uri(media_id)
-        if not uri:
-            _LOG.warning("Unknown media_id format: %s", media_id)
-            return StatusCodes.BAD_REQUEST
-
         device_id = None
         target_volume = None
         if not self._device._is_playing:
@@ -264,10 +259,62 @@ class SpotifyMediaPlayer(MediaPlayerEntity):
             if device_id:
                 target_volume = self._device.get_device_volume(device_id)
 
-        ok = await client.play_uri(uri, device_id)
+        ok = await self._start_playback(client, media_id, device_id)
+        if ok is None:
+            _LOG.warning("Unknown media_id format: %s", media_id)
+            return StatusCodes.BAD_REQUEST
         if ok and device_id and target_volume is not None:
             await client.set_volume(target_volume, device_id)
         return StatusCodes.OK if ok else StatusCodes.SERVER_ERROR
+
+    async def _start_playback(self, client, media_id: str, device_id: str | None) -> bool | None:
+        base, _, ctx = media_id.partition("~ctx~")
+        if not ctx:
+            uri = _media_id_to_uri(media_id)
+            if not uri:
+                return None
+            return await client.play_uri(uri, device_id)
+
+        track_uri = _media_id_to_uri(base)
+        if not track_uri:
+            return None
+
+        kind, _, arg = ctx.partition("~")
+        if kind == "playlist":
+            return await client.play_context(f"spotify:playlist:{arg}", track_uri, device_id)
+        if kind == "album":
+            return await client.play_context(f"spotify:album:{arg}", track_uri, device_id)
+        if kind == "saved":
+            uris = await _collect_window_uris(client.get_saved_tracks, arg, track_key="track")
+            return await client.play_uris(uris, device_id) if uris \
+                else await client.play_uri(track_uri, device_id)
+        if kind == "top":
+            uris = await _collect_window_uris(client.get_top_tracks, arg)
+            return await client.play_uris(uris, device_id) if uris \
+                else await client.play_uri(track_uri, device_id)
+        return None
+
+
+_PLAY_WINDOW = 50
+
+
+async def _collect_window_uris(fetch, offset_str: str, track_key: str | None = None) -> list[str]:
+    try:
+        offset = int(offset_str)
+    except (TypeError, ValueError):
+        return []
+
+    data = await fetch(limit=_PLAY_WINDOW, offset=offset)
+    if not data:
+        return []
+
+    uris: list[str] = []
+    for entry in data.get("items", []):
+        track = entry.get(track_key) if track_key else entry
+        uri = (track or {}).get("uri")
+        if uri:
+            uris.append(uri)
+    return uris
 
 
 def _media_id_to_uri(media_id: str) -> str:
