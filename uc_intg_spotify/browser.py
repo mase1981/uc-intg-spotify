@@ -36,7 +36,7 @@ ROOT_ITEMS = [
 
 
 async def browse(client: SpotifyClient, options: BrowseOptions) -> BrowseResults | StatusCodes:
-    if not client or not client.is_authenticated():
+    if not client or not client.is_authenticated() or client.is_rate_limited():
         return StatusCodes.SERVICE_UNAVAILABLE
 
     media_id = options.media_id if hasattr(options, "media_id") else None
@@ -87,7 +87,7 @@ async def browse(client: SpotifyClient, options: BrowseOptions) -> BrowseResults
 
 
 async def search(client: SpotifyClient, options: SearchOptions) -> SearchResults | StatusCodes:
-    if not client or not client.is_authenticated():
+    if not client or not client.is_authenticated() or client.is_rate_limited():
         return StatusCodes.SERVICE_UNAVAILABLE
 
     query = options.query if hasattr(options, "query") else ""

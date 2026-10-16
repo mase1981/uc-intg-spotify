@@ -4,6 +4,7 @@ from __future__ import annotations
 import base64
 import logging
 import ssl
+import time
 import urllib.parse
 from typing import Any
 
@@ -17,6 +18,22 @@ SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token"
 SPOTIFY_API_BASE_URL = "https://api.spotify.com/v1"
 
 REDIRECT_URI = "https://example.com/callback"
+
+DEFAULT_RETRY_AFTER = 30
+MAX_RETRY_AFTER = 86400
+
+
+def _now() -> float:
+    return time.monotonic()
+
+
+def _retry_after_seconds(value: str | None) -> int:
+    """Seconds to pause after a 429, from the Retry-After header (whole seconds)."""
+    try:
+        seconds = int(value) if value is not None else DEFAULT_RETRY_AFTER
+    except ValueError:
+        seconds = DEFAULT_RETRY_AFTER
+    return max(1, min(seconds, MAX_RETRY_AFTER))
 
 
 class SpotifyAuthError(Exception):
@@ -47,6 +64,7 @@ class SpotifyClient:
         self._client_secret = ""
         self._session: aiohttp.ClientSession | None = None
         self._on_token_refresh: Any = None
+        self._blocked_until: float = 0.0
 
     def set_credentials(self, client_id: str, client_secret: str) -> None:
         self._client_id = client_id
@@ -61,6 +79,20 @@ class SpotifyClient:
 
     def is_authenticated(self) -> bool:
         return bool(self._access_token and self._refresh_token)
+
+    def rate_limit_remaining(self) -> float:
+        """Seconds left before Spotify accepts Web API calls again, 0 when not limited."""
+        return max(0.0, self._blocked_until - _now())
+
+    def is_rate_limited(self) -> bool:
+        return self.rate_limit_remaining() > 0
+
+    async def _pause_for_rate_limit(self, response: aiohttp.ClientResponse) -> None:
+        seconds = _retry_after_seconds(response.headers.get("Retry-After"))
+        self._blocked_until = _now() + seconds
+        body = await response.text()
+        reason = "quota exceeded" if "QUOTA_EXCEEDED" in body else "rate limited"
+        _LOG.warning("Spotify Web API %s: pausing all API calls for %d s", reason, seconds)
 
     @property
     def access_token(self) -> str:
@@ -170,6 +202,8 @@ class SpotifyClient:
         if not self._access_token:
             _LOG.error("Not authenticated")
             return None
+        if self.is_rate_limited():
+            return None
 
         try:
             session = await self._get_session()
@@ -187,7 +221,13 @@ class SpotifyClient:
                     async with session.request(method, url, headers=headers, **kwargs) as retry:
                         if 200 <= retry.status < 300:
                             return {} if retry.status == 204 else await retry.json()
+                        if retry.status == 429:
+                            await self._pause_for_rate_limit(retry)
                         return None
+
+                if response.status == 429:
+                    await self._pause_for_rate_limit(response)
+                    return None
 
                 if 200 <= response.status < 300:
                     if response.status == 204:

@@ -50,7 +50,7 @@ class SpotifyDeviceSelect(SelectEntity):
         self, entity: Select, cmd_id: str, params: dict[str, Any] | None
     ) -> StatusCodes:
         client = self._device.client
-        if not client or not client.is_authenticated():
+        if not client or not client.is_authenticated() or client.is_rate_limited():
             return StatusCodes.SERVICE_UNAVAILABLE
 
         if cmd_id == Commands.SELECT_OPTION:
@@ -59,19 +59,21 @@ class SpotifyDeviceSelect(SelectEntity):
                 return StatusCodes.BAD_REQUEST
 
             ok = await self._device.select_source(option)
-            return StatusCodes.OK if ok else StatusCodes.SERVER_ERROR
+            status = StatusCodes.OK if ok else StatusCodes.SERVER_ERROR
+        elif cmd_id == Commands.SELECT_NEXT:
+            status = await self._select_adjacent(1)
+        elif cmd_id == Commands.SELECT_PREVIOUS:
+            status = await self._select_adjacent(-1)
+        else:
+            return StatusCodes.NOT_IMPLEMENTED
 
-        if cmd_id == Commands.SELECT_NEXT:
-            return await self._select_adjacent(1)
-
-        if cmd_id == Commands.SELECT_PREVIOUS:
-            return await self._select_adjacent(-1)
-
-        return StatusCodes.NOT_IMPLEMENTED
+        if status == StatusCodes.SERVER_ERROR and client.is_rate_limited():
+            return StatusCodes.SERVICE_UNAVAILABLE
+        return status
 
     async def _select_adjacent(self, direction: int) -> StatusCodes:
         client = self._device.client
-        if not client or not client.is_authenticated():
+        if not client or not client.is_authenticated() or client.is_rate_limited():
             return StatusCodes.SERVICE_UNAVAILABLE
 
         options = self._device._source_list

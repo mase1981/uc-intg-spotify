@@ -28,6 +28,13 @@ DEVICE_CACHE_TTL = 86400  # 24 hours
 PLAYBACK_REFRESH_DELAY = 0.5
 ACTIVATION_POLL_ATTEMPTS = 20
 ACTIVATION_POLL_INTERVAL = 1.0
+IDLE_POLL_INTERVAL = 60
+DEVICE_LIST_INTERVAL = 60
+
+
+def _now() -> float:
+    return time.monotonic()
+
 
 _DEVICE_TYPE_LABELS = {
     "Computer": "Computer",
@@ -66,6 +73,8 @@ class SpotifyDevice(PollingDevice):
         poll_interval = device_config.polling_interval or 10
         super().__init__(device_config, poll_interval=poll_interval, **kwargs)
         self._device_config: SpotifyDeviceConfig = device_config
+        self._playing_poll_interval: int = poll_interval
+        self._devices_fetched_at: float | None = None
         self._client: SpotifyClient | None = None
         self._state: str = "UNAVAILABLE"
 
@@ -271,12 +280,17 @@ class SpotifyDevice(PollingDevice):
         _LOG.info("[%s] Connected to Spotify", self.log_id)
 
     async def poll_device(self) -> None:
-        if not self._client:
+        if not self._client or self._client.is_rate_limited():
             return
 
         try:
             playback = await self._client.get_playback_state()
-            devices = await self._client.get_available_devices()
+            devices = self._devices
+            if self._device_list_due():
+                devices = await self._client.get_available_devices()
+                self._devices_fetched_at = _now()
+            if self._client.is_rate_limited():
+                return
 
             if playback and playback.get("title"):
                 self._is_playing = playback.get("is_playing", False)
@@ -347,6 +361,7 @@ class SpotifyDevice(PollingDevice):
             await resolve_device_names(self._discovery)
             self._enrich_api_device_names()
             self._source_list = self._build_source_list(devices)
+            self._poll_interval = self._playing_poll_interval if self._is_playing else IDLE_POLL_INTERVAL
 
             self.push_update()
 
@@ -357,6 +372,9 @@ class SpotifyDevice(PollingDevice):
             if self._state != "UNAVAILABLE":
                 self._state = "UNAVAILABLE"
                 self.events.emit(DeviceEvents.DISCONNECTED, self.identifier)
+
+    def _device_list_due(self) -> bool:
+        return self._devices_fetched_at is None or _now() - self._devices_fetched_at >= DEVICE_LIST_INTERVAL
 
     async def _handle_auth_failure(self) -> None:
         """Discard the expired refresh token and flag that re-authentication is required."""

@@ -67,16 +67,19 @@ class SpotifyRemote(RemoteEntity):
         self, entity: remote.Remote, cmd_id: str, params: dict[str, Any] | None
     ) -> StatusCodes:
         client = self._device.client
-        if not client or not client.is_authenticated():
+        if not client or not client.is_authenticated() or client.is_rate_limited():
             return StatusCodes.SERVICE_UNAVAILABLE
 
         try:
-            if cmd_id == remote.Commands.SEND_CMD:
-                return await self._handle_send_cmd(client, params)
-            return StatusCodes.NOT_IMPLEMENTED
+            if cmd_id != remote.Commands.SEND_CMD:
+                return StatusCodes.NOT_IMPLEMENTED
+            status = await self._handle_send_cmd(client, params)
         except Exception as err:
             _LOG.error("Remote command %s failed: %s", cmd_id, err)
-            return StatusCodes.SERVER_ERROR
+            status = StatusCodes.SERVER_ERROR
+        if status == StatusCodes.SERVER_ERROR and client.is_rate_limited():
+            return StatusCodes.SERVICE_UNAVAILABLE
+        return status
 
     async def _handle_send_cmd(self, client, params: dict[str, Any] | None) -> StatusCodes:
         if not params or "command" not in params:
