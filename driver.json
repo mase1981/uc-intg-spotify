@@ -1,6 +1,6 @@
 {
   "driver_id": "spotify",
-  "version": "3.5.0",
+  "version": "3.5.1",
   "min_core_api": "0.22.0",
   "name": {
     "en": "Spotify"
@@ -35,5 +35,5 @@
       }
     ]
   },
-  "release_date": "2026-06-19"
+  "release_date": "2026-10-16"
 }
