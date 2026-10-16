@@ -114,14 +114,17 @@ class SpotifyMediaPlayer(MediaPlayerEntity):
         self, entity: media_player.MediaPlayer, cmd_id: str, params: dict[str, Any] | None
     ) -> StatusCodes:
         client = self._device.client
-        if not client or not client.is_authenticated():
+        if not client or not client.is_authenticated() or client.is_rate_limited():
             return StatusCodes.SERVICE_UNAVAILABLE
 
         try:
-            return await self._dispatch_command(client, cmd_id, params)
+            status = await self._dispatch_command(client, cmd_id, params)
         except Exception as err:
             _LOG.error("Command %s failed: %s", cmd_id, err)
-            return StatusCodes.SERVER_ERROR
+            status = StatusCodes.SERVER_ERROR
+        if status == StatusCodes.SERVER_ERROR and client.is_rate_limited():
+            return StatusCodes.SERVICE_UNAVAILABLE
+        return status
 
     async def _dispatch_command(self, client, cmd_id: str, params: dict[str, Any] | None) -> StatusCodes:
         if cmd_id == media_player.Commands.ON:
