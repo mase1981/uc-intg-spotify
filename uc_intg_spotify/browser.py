@@ -34,6 +34,9 @@ ROOT_ITEMS = [
     ("queue", "Queue", MediaClass.TRACK),
 ]
 
+ARTIST_ALBUMS_PAGE = 10
+NEW_RELEASES_PAGE = 10
+
 
 async def browse(client: SpotifyClient, options: BrowseOptions) -> BrowseResults | StatusCodes:
     if not client or not client.is_authenticated() or client.is_rate_limited():
@@ -411,7 +414,7 @@ async def _browse_followed_artists(client: SpotifyClient, options: BrowseOptions
 
 async def _browse_new_releases(client: SpotifyClient, options: BrowseOptions) -> BrowseResults:
     page = _get_page(options)
-    limit = _get_limit(options, default=20)
+    limit = min(_get_limit(options, default=NEW_RELEASES_PAGE), NEW_RELEASES_PAGE)
     offset = (page - 1) * limit
 
     data = await client.get_new_releases(limit=limit, offset=offset)
@@ -582,21 +585,27 @@ async def _browse_artist(
     artist_images = artist_data.get("images", [])
     artist_thumbnail = artist_images[0]["url"] if artist_images else None
 
+    page = _get_page(options)
+    limit = min(_get_limit(options, default=ARTIST_ALBUMS_PAGE), ARTIST_ALBUMS_PAGE)
+    offset = (page - 1) * limit
+
     items = []
 
-    top_tracks = await client.get_artist_top_tracks(artist_id)
-    if top_tracks:
-        for track in top_tracks.get("tracks", []):
-            item = _track_to_browse_item(track)
-            if item:
-                items.append(item)
+    if page == 1:
+        top_tracks = await client.get_artist_top_tracks(artist_id, artist_data.get("name", ""))
+        if top_tracks:
+            for track in top_tracks.get("tracks", []):
+                item = _track_to_browse_item(track)
+                if item:
+                    items.append(item)
 
-    albums = await client.get_artist_albums(artist_id, limit=20)
+    albums = await client.get_artist_albums(artist_id, limit=limit, offset=offset)
     if albums:
         for album in albums.get("items", []):
             item = _album_to_browse_item(album)
             if item:
                 items.append(item)
+    total = (albums or {}).get("total", 0)
 
     return BrowseResults(
         media=BrowseMediaItem(
@@ -608,7 +617,7 @@ async def _browse_artist(
             thumbnail=artist_thumbnail,
             items=items,
         ),
-        pagination=Pagination(page=1, limit=len(items), count=len(items)),
+        pagination=Pagination(page=page, limit=limit, count=total),
     )
 
 
