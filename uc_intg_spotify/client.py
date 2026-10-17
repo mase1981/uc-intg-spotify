@@ -65,7 +65,6 @@ class SpotifyClient:
         self._session: aiohttp.ClientSession | None = None
         self._on_token_refresh: Any = None
         self._blocked_until: float = 0.0
-        self._last_status: int | None = None
         self._refused: set[str] = set()
 
     def set_credentials(self, client_id: str, client_secret: str) -> None:
@@ -201,12 +200,23 @@ class SpotifyClient:
     async def _api_request(
         self, method: str, endpoint: str, **kwargs: Any
     ) -> dict[str, Any] | None:
+        data, _ = await self._api_request_status(method, endpoint, **kwargs)
+        return data
+
+    async def _api_request_status(
+        self, method: str, endpoint: str, **kwargs: Any
+    ) -> tuple[dict[str, Any] | None, int | None]:
+        """Perform a request and return (data, http_status).
+
+        The status is returned to the caller instead of stored on the client so
+        concurrent requests (polling vs. browsing share one client) cannot read
+        each other's status. http_status is None when no request was sent.
+        """
         if not self._access_token:
             _LOG.error("Not authenticated")
-            return None
+            return None, None
         if self.is_rate_limited():
-            return None
-        self._last_status = None
+            return None, None
 
         try:
             session = await self._get_session()
@@ -216,40 +226,40 @@ class SpotifyClient:
             url = f"{SPOTIFY_API_BASE_URL}{endpoint}"
 
             async with session.request(method, url, headers=headers, **kwargs) as response:
-                self._last_status = response.status
-                if response.status == 401:
+                status = response.status
+                if status == 401:
                     token_data = await self.refresh_access_token()
                     if not token_data:
-                        return None
+                        return None, status
                     headers["Authorization"] = f"Bearer {self._access_token}"
                     async with session.request(method, url, headers=headers, **kwargs) as retry:
-                        self._last_status = retry.status
-                        if 200 <= retry.status < 300:
-                            return {} if retry.status == 204 else await retry.json()
-                        if retry.status == 429:
+                        status = retry.status
+                        if 200 <= status < 300:
+                            return ({} if status == 204 else await retry.json()), status
+                        if status == 429:
                             await self._pause_for_rate_limit(retry)
-                        return None
+                        return None, status
 
-                if response.status == 429:
+                if status == 429:
                     await self._pause_for_rate_limit(response)
-                    return None
+                    return None, status
 
-                if 200 <= response.status < 300:
-                    if response.status == 204:
-                        return {}
+                if 200 <= status < 300:
+                    if status == 204:
+                        return {}, status
                     try:
-                        return await response.json()
+                        return await response.json(), status
                     except (aiohttp.ContentTypeError, ValueError):
-                        return {}
+                        return {}, status
 
                 body = await response.text()
-                _LOG.error("API %s %s failed: %s - %s", method, endpoint, response.status, body[:500])
-                return None
+                _LOG.error("API %s %s failed: %s - %s", method, endpoint, status, body[:500])
+                return None, status
         except SpotifyAuthError:
             raise
         except Exception as e:
             _LOG.error("API request error: %s", e)
-            return None
+            return None, None
 
     # ── Playback State ──
 
@@ -427,8 +437,8 @@ class SpotifyClient:
         """
         if name in self._refused:
             return None
-        data = await self._api_request("GET", endpoint)
-        if data is None and self._last_status in (403, 404):
+        data, status = await self._api_request_status("GET", endpoint)
+        if data is None and status in (403, 404):
             self._refused.add(name)
             _LOG.info("Spotify refused %s for this app; using search instead", name)
         return data
