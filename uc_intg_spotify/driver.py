@@ -25,3 +25,8 @@ class SpotifyDriver(BaseIntegrationDriver[SpotifyDevice, SpotifyDeviceConfig]):
             driver_id="spotify",
             require_connection_before_registry=True,
         )
+
+    async def on_r2_connect_cmd(self) -> None:
+        await super().on_r2_connect_cmd()
+        for device in self._device_instances.values():
+            self._loop.create_task(device.poll_device())

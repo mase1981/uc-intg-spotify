@@ -268,6 +268,8 @@ class SpotifyMediaPlayer(MediaPlayerEntity):
             return StatusCodes.BAD_REQUEST
         if ok and device_id and target_volume is not None:
             await client.set_volume(target_volume, device_id)
+        if ok:
+            self._device.schedule_playback_refresh()
         return StatusCodes.OK if ok else StatusCodes.SERVER_ERROR
 
     async def _start_playback(self, client, media_id: str, device_id: str | None) -> bool | None:
