@@ -35,6 +35,7 @@ ROOT_ITEMS = [
 ]
 
 ARTIST_ALBUMS_PAGE = 10
+NEW_RELEASES_PAGE = 10
 
 
 async def browse(client: SpotifyClient, options: BrowseOptions) -> BrowseResults | StatusCodes:
@@ -413,7 +414,7 @@ async def _browse_followed_artists(client: SpotifyClient, options: BrowseOptions
 
 async def _browse_new_releases(client: SpotifyClient, options: BrowseOptions) -> BrowseResults:
     page = _get_page(options)
-    limit = _get_limit(options, default=20)
+    limit = min(_get_limit(options, default=NEW_RELEASES_PAGE), NEW_RELEASES_PAGE)
     offset = (page - 1) * limit
 
     data = await client.get_new_releases(limit=limit, offset=offset)
@@ -591,7 +592,7 @@ async def _browse_artist(
     items = []
 
     if page == 1:
-        top_tracks = await client.get_artist_top_tracks(artist_id)
+        top_tracks = await client.get_artist_top_tracks(artist_id, artist_data.get("name", ""))
         if top_tracks:
             for track in top_tracks.get("tracks", []):
                 item = _track_to_browse_item(track)

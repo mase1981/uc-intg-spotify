@@ -65,6 +65,8 @@ class SpotifyClient:
         self._session: aiohttp.ClientSession | None = None
         self._on_token_refresh: Any = None
         self._blocked_until: float = 0.0
+        self._last_status: int | None = None
+        self._refused: set[str] = set()
 
     def set_credentials(self, client_id: str, client_secret: str) -> None:
         self._client_id = client_id
@@ -204,6 +206,7 @@ class SpotifyClient:
             return None
         if self.is_rate_limited():
             return None
+        self._last_status = None
 
         try:
             session = await self._get_session()
@@ -213,12 +216,14 @@ class SpotifyClient:
             url = f"{SPOTIFY_API_BASE_URL}{endpoint}"
 
             async with session.request(method, url, headers=headers, **kwargs) as response:
+                self._last_status = response.status
                 if response.status == 401:
                     token_data = await self.refresh_access_token()
                     if not token_data:
                         return None
                     headers["Authorization"] = f"Bearer {self._access_token}"
                     async with session.request(method, url, headers=headers, **kwargs) as retry:
+                        self._last_status = retry.status
                         if 200 <= retry.status < 300:
                             return {} if retry.status == 204 else await retry.json()
                         if retry.status == 429:
@@ -414,10 +419,34 @@ class SpotifyClient:
     async def get_artist(self, artist_id: str) -> dict[str, Any] | None:
         return await self._api_request("GET", f"/artists/{artist_id}")
 
-    async def get_artist_top_tracks(self, artist_id: str) -> dict[str, Any] | None:
-        return await self._api_request(
-            "GET", f"/artists/{artist_id}/top-tracks?market=from_token"
+    async def _get_unless_refused(self, name: str, endpoint: str) -> dict[str, Any] | None:
+        """GET an endpoint Spotify may refuse for newer Development Mode apps.
+
+        A 403 or 404 is remembered for the session, so the refused endpoint is not
+        called again and the caller goes straight to its search fallback.
+        """
+        if name in self._refused:
+            return None
+        data = await self._api_request("GET", endpoint)
+        if data is None and self._last_status in (403, 404):
+            self._refused.add(name)
+            _LOG.info("Spotify refused %s for this app; using search instead", name)
+        return data
+
+    async def get_artist_top_tracks(self, artist_id: str, artist_name: str = "") -> dict[str, Any] | None:
+        data = await self._get_unless_refused(
+            "artist top tracks", f"/artists/{artist_id}/top-tracks?market=from_token"
         )
+        if data is not None or "artist top tracks" not in self._refused or not artist_name:
+            return data
+        found = await self.search(f'artist:"{artist_name}"', limit=10, types="track")
+        if found is None:
+            return None
+        tracks = [
+            track for track in found.get("tracks", {}).get("items", [])
+            if any(artist.get("id") == artist_id for artist in track.get("artists", []))
+        ]
+        return {"tracks": tracks}
 
     async def get_artist_albums(
         self, artist_id: str, limit: int = 20, offset: int = 0
@@ -454,18 +483,21 @@ class SpotifyClient:
     async def get_new_releases(
         self, limit: int = 20, offset: int = 0
     ) -> dict[str, Any] | None:
-        return await self._api_request(
-            "GET", f"/browse/new-releases?limit={limit}&offset={offset}"
+        data = await self._get_unless_refused(
+            "new releases", f"/browse/new-releases?limit={limit}&offset={offset}"
         )
+        if data is not None or "new releases" not in self._refused:
+            return data
+        return await self.search("tag:new", limit=limit, offset=offset, types="album")
 
     async def search(
-        self, query: str, limit: int = 20, offset: int = 0
+        self, query: str, limit: int = 20, offset: int = 0, types: str = "track,album,artist,playlist"
     ) -> dict[str, Any] | None:
         encoded = urllib.parse.quote(query)
         limit = max(1, min(limit, 10))
         return await self._api_request(
             "GET",
-            f"/search?q={encoded}&type=track,album,artist,playlist&limit={limit}&offset={offset}&market=from_token",
+            f"/search?q={encoded}&type={types}&limit={limit}&offset={offset}&market=from_token",
         )
 
     async def get_user_profile(self) -> dict[str, Any] | None:
