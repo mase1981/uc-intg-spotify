@@ -320,6 +320,26 @@ class SpotifyClient:
         endpoint = "/me/player/pause" if is_playing else "/me/player/play"
         return await self._api_request("PUT", endpoint) is not None
 
+    async def play_with_status(self, device_id: str | None = None) -> tuple[bool, int | None]:
+        endpoint = "/me/player/play"
+        if device_id:
+            endpoint += f"?device_id={device_id}"
+        data, status = await self._api_request_status("PUT", endpoint)
+        return data is not None, status
+
+    async def pause_with_status(self) -> tuple[bool, int | None]:
+        data, status = await self._api_request_status("PUT", "/me/player/pause")
+        return data is not None, status
+
+    async def start_playback(
+        self, body: dict[str, Any], device_id: str | None = None
+    ) -> tuple[bool, int | None]:
+        endpoint = "/me/player/play"
+        if device_id:
+            endpoint += f"?device_id={device_id}"
+        data, status = await self._api_request_status("PUT", endpoint, json=body)
+        return data is not None, status
+
     async def next_track(self) -> bool:
         return await self._api_request("POST", "/me/player/next") is not None
 

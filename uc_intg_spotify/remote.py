@@ -90,23 +90,24 @@ class SpotifyRemote(RemoteEntity):
 
         if command == "PLAY_PAUSE":
             if self._device._is_playing:
-                ok = await client.pause()
+                ok = await self._device.pause_playback()
                 is_playing = False
             else:
-                device_id = self._device.get_first_available_device_id()
-                ok = await client.play(device_id)
+                ok = await self._device.resume_playback()
                 is_playing = True
             if ok:
                 self._device.set_playing_state(is_playing)
                 self._device.schedule_playback_refresh()
         elif command == "PLAY":
-            device_id = self._device.get_first_available_device_id() if not self._device._is_playing else None
-            ok = await client.play(device_id)
+            if self._device._is_playing:
+                ok = await client.play()
+            else:
+                ok = await self._device.resume_playback()
             if ok:
                 self._device.set_playing_state(True)
                 self._device.schedule_playback_refresh()
         elif command == "PAUSE":
-            ok = await client.pause()
+            ok = await self._device.pause_playback()
             if ok:
                 self._device.set_playing_state(False)
                 self._device.schedule_playback_refresh()

@@ -30,6 +30,9 @@ ACTIVATION_POLL_ATTEMPTS = 20
 ACTIVATION_POLL_INTERVAL = 1.0
 IDLE_POLL_INTERVAL = 60
 DEVICE_LIST_INTERVAL = 60
+PLAYER_REFUSED_STATUSES = (403, 404)
+RESUMABLE_CONTEXT_TYPES = ("album", "playlist")
+MAX_RESUME_DEVICES = 3
 
 
 def _now() -> float:
@@ -107,6 +110,12 @@ class SpotifyDevice(PollingDevice):
         self._login_id: str = device_config.user_id or ""
         self._resolved_names: dict[str, str] = {}
 
+        self._last_device_id: str = ""
+        self._resume_media_uri: str = ""
+        self._resume_context_uri: str = ""
+        self._resume_context_type: str = ""
+        self._resume_position_ms: int = 0
+
     @property
     def identifier(self) -> str:
         return self._device_config.identifier
@@ -144,6 +153,67 @@ class SpotifyDevice(PollingDevice):
         if self._devices:
             return self._devices[0].get("id")
         return None
+
+    def _resume_targets(self) -> list[str | None]:
+        """Devices to try for a resume, best first; None lets Spotify pick its active device."""
+        usable = [d for d in self._devices if d.get("id") and not d.get("is_restricted")]
+        listed = [d["id"] for d in usable]
+        active = next((d["id"] for d in usable if d.get("is_active")), None)
+        last = self._last_device_id if (not self._devices or self._last_device_id in listed) else None
+        targets: list[str | None] = []
+        for candidate in (active, last, *listed):
+            if candidate and candidate not in targets:
+                targets.append(candidate)
+        targets = targets[:MAX_RESUME_DEVICES]
+        targets.append(None)
+        return targets
+
+    def _resume_body(self) -> dict[str, Any] | None:
+        """Request body to restart the last known track when Spotify holds no resumable session."""
+        if not self._resume_media_uri:
+            return None
+        body: dict[str, Any]
+        if self._resume_context_uri and self._resume_context_type in RESUMABLE_CONTEXT_TYPES:
+            body = {"context_uri": self._resume_context_uri, "offset": {"uri": self._resume_media_uri}}
+        else:
+            body = {"uris": [self._resume_media_uri]}
+        if self._resume_position_ms > 0:
+            body["position_ms"] = self._resume_position_ms
+        return body
+
+    async def resume_playback(self) -> bool:
+        """Resume playback, falling back across devices and to the last track when Spotify
+        has no live session to resume (403 restriction / 404 device not found)."""
+        if not self._client:
+            return False
+        targets = self._resume_targets()
+        for device_id in targets:
+            ok, status = await self._client.play_with_status(device_id)
+            if ok:
+                return True
+            if status not in PLAYER_REFUSED_STATUSES:
+                break
+        else:
+            body = self._resume_body()
+            if body:
+                for device_id in targets:
+                    ok, status = await self._client.start_playback(body, device_id)
+                    if ok:
+                        return True
+                    if status not in PLAYER_REFUSED_STATUSES:
+                        break
+        self.schedule_playback_refresh()
+        return False
+
+    async def pause_playback(self) -> bool:
+        """Pause playback; a 403/404 means nothing is playing, which is the requested state."""
+        if not self._client:
+            return False
+        ok, status = await self._client.pause_with_status()
+        if ok or status in PLAYER_REFUSED_STATUSES:
+            return True
+        self.schedule_playback_refresh()
+        return False
 
     def _find_zeroconf_device_by_name(self, name: str) -> dict[str, Any] | None:
         for zc_dev in self._discovery.devices.values():
@@ -321,6 +391,12 @@ class SpotifyDevice(PollingDevice):
                     self._context_type = ""
 
                 active_id = playback.get("device_id", "")
+                if active_id:
+                    self._last_device_id = active_id
+                self._resume_media_uri = self._media_uri
+                self._resume_context_uri = self._context_uri
+                self._resume_context_type = self._context_type
+                self._resume_position_ms = playback.get("progress_ms", 0)
                 active_dev = next((d for d in devices if d.get("id") == active_id), None)
                 if active_dev:
                     self._source_name = device_display_name(active_dev)
