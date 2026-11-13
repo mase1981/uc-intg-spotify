@@ -296,10 +296,24 @@ class SpotifyMediaPlayer(MediaPlayerEntity):
             uris = await _collect_window_uris(client.get_top_tracks, arg)
             return await client.play_uris(uris, device_id) if uris \
                 else await client.play_uri(track_uri, device_id)
+        if kind == "artist":
+            uris = await _artist_top_track_uris_from(client, arg, track_uri)
+            return await client.play_uris(uris, device_id) if uris \
+                else await client.play_uri(track_uri, device_id)
         return None
 
 
 _PLAY_WINDOW = 50
+
+
+async def _artist_top_track_uris_from(client, artist_id: str, track_uri: str) -> list[str]:
+    data = await client.get_artist_top_tracks(artist_id)
+    if not data:
+        artist = await client.get_artist(artist_id)
+        if artist and artist.get("name"):
+            data = await client.get_artist_top_tracks(artist_id, artist["name"])
+    uris = [t["uri"] for t in (data or {}).get("tracks", []) if t.get("uri")]
+    return uris[uris.index(track_uri):] if track_uri in uris else []
 
 
 async def _collect_window_uris(fetch, offset_str: str, track_key: str | None = None) -> list[str]:

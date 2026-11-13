@@ -595,7 +595,7 @@ async def _browse_artist(
         top_tracks = await client.get_artist_top_tracks(artist_id, artist_data.get("name", ""))
         if top_tracks:
             for track in top_tracks.get("tracks", []):
-                item = _track_to_browse_item(track)
+                item = _track_to_browse_item(track, context=("artist", artist_id))
                 if item:
                     items.append(item)
 
