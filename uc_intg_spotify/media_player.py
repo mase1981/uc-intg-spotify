@@ -257,7 +257,7 @@ class SpotifyMediaPlayer(MediaPlayerEntity):
         device_id = None
         target_volume = None
         if not self._device._is_playing:
-            device_id = self._device.get_first_available_device_id()
+            device_id = self._device.get_preferred_device_id()
             if device_id:
                 target_volume = self._device.get_device_volume(device_id)
 

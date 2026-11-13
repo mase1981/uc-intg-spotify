@@ -149,10 +149,9 @@ class SpotifyDevice(PollingDevice):
                 return zc_dev.get("device_id", "")
         return None
 
-    def get_first_available_device_id(self) -> str | None:
-        if self._devices:
-            return self._devices[0].get("id")
-        return None
+    def get_preferred_device_id(self) -> str | None:
+        """Device to start new media on: the active one, then the last one used, then the first listed."""
+        return self._resume_targets()[0]
 
     def _resume_targets(self) -> list[str | None]:
         """Devices to try for a resume, best first; None lets Spotify pick its active device."""
